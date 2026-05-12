@@ -6,4 +6,3 @@ openpyxl
 python-dotenv
 schedule
 lxml
-print(19*4+6+16)
