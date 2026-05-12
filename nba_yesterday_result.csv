@@ -1,0 +1,4 @@
+﻿客隊,主隊,推薦,信心分數,分析文字,預測總分,盤口總分,差距,台灣開賽時間,預測分差,讓分盤,讓分差距,比賽鍵,推薦種類,同場雙推,客隊得分,主隊得分,結果
+Phoenix Suns,Oklahoma City Thunder,大分 215.5,40,模型預測總分為 230，高於盤口 215.5，差距 14.5 分，傾向大分。,230.0,215.5,14.5,2026-04-23 09:40,,,,Phoenix Suns vs Oklahoma City Thunder,其他,False,,,無法判定
+Phoenix Suns,Oklahoma City Thunder,Phoenix Suns 受讓 17.5,40,模型預測主隊 Oklahoma City Thunder 贏 2 分，但對照主隊讓分 17.5 分後，客隊仍有 15.5 分空間，傾向客隊受讓過盤。,,,,2026-04-23 09:40,2.0,-17.5,-15.5,Phoenix Suns vs Oklahoma City Thunder,其他,False,,,無法判定
+Orlando Magic,Detroit Pistons,Orlando Magic 受讓 8.5,34,模型預測主隊 Detroit Pistons 贏 -3 分，但對照主隊讓分 8.5 分後，客隊仍有 11.5 分空間，傾向客隊受讓過盤。,,,,2026-04-23 07:10,-3.0,-8.5,-11.5,Orlando Magic vs Detroit Pistons,其他,False,,,無法判定

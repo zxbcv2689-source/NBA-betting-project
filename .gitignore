@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+data/*.csv
+logs/
+old_versions/
+output/
+reports/
+*_backup*
+reports/
+*_backup*
