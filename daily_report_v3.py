@@ -224,7 +224,6 @@ def build_recent_games_cache(today_tw, lookback_days=60):
 
     return cache_df
 
-
 def get_recent_games_cache(today_tw):
     global RECENT_GAMES_CACHE
 
@@ -235,7 +234,6 @@ def get_recent_games_cache(today_tw):
     cache_df = load_recent_games_cache()
 
     if not cache_df.empty:
-
         cache_time = datetime.fromtimestamp(
             RECENT_GAMES_CACHE_CSV.stat().st_mtime
         ).date()
@@ -244,9 +242,13 @@ def get_recent_games_cache(today_tw):
 
         if cache_time == today_date:
             print("已載入今日 recent_games_cache.csv")
-
             RECENT_GAMES_CACHE = cache_df
+            print("近況資料筆數：", len(RECENT_GAMES_CACHE))
             return RECENT_GAMES_CACHE
+
+    # ===== 沒有今日 cache，就重新建立 =====
+    print("正在建立近10場共用資料快取...")
+    RECENT_GAMES_CACHE = build_recent_games_cache(today_tw)
 
     print("近況資料筆數：", len(RECENT_GAMES_CACHE))
 
@@ -257,31 +259,11 @@ def get_recent_games_cache(today_tw):
             index=False,
             encoding="utf-8-sig"
         )
-
         print("已儲存 recent_games_cache.csv")
-
     except Exception as e:
         print("儲存 recent_games_cache.csv 失敗：", e)
 
     return RECENT_GAMES_CACHE
-
-    print("近況資料筆數：", len(RECENT_GAMES_CACHE))
-
-    # ===== 存成永久 cache =====
-    try:
-        RECENT_GAMES_CACHE.to_csv(
-            RECENT_GAMES_CACHE_CSV,
-            index=False,
-            encoding="utf-8-sig"
-        )
-
-        print("已儲存 recent_games_cache.csv")
-
-    except Exception as e:
-        print("儲存 recent_games_cache.csv 失敗：", e)
-
-    return RECENT_GAMES_CACHE
-
 def calc_recent_10_team_form(team_name, today_tw):
     """
     計算單一球隊近10場狀態：
