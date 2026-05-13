@@ -1,0 +1,584 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>NBA 預測分析報告 v3</title>
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif;
+    background: #f5f2ec;
+    color: #2b2b2b;
+    margin: 0;
+    padding: 22px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+h2 {
+    margin: 26px 0 12px;
+    font-size: 22px;
+}
+
+.subtitle {
+    color: #777;
+    margin-top: 8px;
+}
+
+.verify-summary {
+    background: #efe3d1;
+    border: 1px solid #c7a46b;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.card,
+.section,
+.game-card,
+.final-card {
+    background: #fffdf8;
+    border: 1px solid #eadfce;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(90, 65, 30, 0.08);
+}
+
+.card {
+    padding: 15px;
+}
+
+.card .label {
+    color: #7c6f5f;
+    font-size: 14px;
+}
+
+.card .value {
+    font-size: 22px;
+    font-weight: 800;
+    margin-top: 5px;
+}
+
+.section {
+    padding: 16px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+}
+
+.game-card {
+    padding: 18px;
+    margin-bottom: 14px;
+}
+
+.game-time {
+    color: #8a7a66;
+    font-size: 14px;
+}
+
+.matchup {
+    font-size: 22px;
+    font-weight: 800;
+    margin: 6px 0 14px;
+}
+
+.pick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.pick-box {
+    background: #f8f1e7;
+    border-radius: 14px;
+    padding: 14px;
+}
+
+.main-pick {
+    background: #efe3d1;
+}
+
+.pick-label {
+    color: #7b6b59;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.pick-value {
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.pick-note,
+.detail-line,
+.market-line {
+    color: #6c6257;
+    font-size: 14px;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+
+.final-wrap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.final-card {
+    padding: 16px;
+}
+
+.final-main {
+    background: #efe3d1;
+    border: 2px solid #c7a46b;
+}
+
+.final-level {
+    color: #7b6b59;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.final-game {
+    font-size: 17px;
+    font-weight: 800;
+    margin-top: 8px;
+}
+
+.final-pick {
+    font-size: 23px;
+    font-weight: 900;
+    margin-top: 8px;
+}
+
+.final-score,
+.final-reason {
+    color: #6c6257;
+    font-size: 14px;
+    margin-top: 8px;
+    line-height: 1.5;
+}
+
+.top3-card {
+    background: #f8f1e7;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+}
+
+.top3-rank {
+    font-size: 13px;
+    color: #7b6b59;
+    font-weight: 800;
+}
+
+.top3-game {
+    font-size: 16px;
+    font-weight: 800;
+    margin-top: 6px;
+}
+
+.top3-pick {
+    font-size: 19px;
+    font-weight: 900;
+    margin-top: 6px;
+}
+
+.top3-info {
+    font-size: 13px;
+    color: #6c6257;
+    margin-top: 6px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    background: #fffdf8;
+}
+
+.data-table th {
+    background: #4a3525;
+    color: white;
+    padding: 10px;
+    white-space: nowrap;
+}
+
+.data-table td {
+    border-bottom: 1px solid #eee3d3;
+    padding: 10px;
+    vertical-align: top;
+}
+
+.data-table tr:nth-child(even) td {
+    background: #faf5ed;
+}
+
+.history-box {
+    margin: 20px 0;
+    background: #fffdf8;
+    border: 1px solid #eadfce;
+    border-radius: 16px;
+    padding: 16px;
+}
+
+.history-box summary {
+    font-size: 18px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.empty {
+    color: #8a7a66;
+}
+
+.note {
+    color: #6c6257;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.result-win {
+    color: #15803d;
+    font-weight: 900;
+}
+
+.result-loss,
+.result-lose {
+    color: #b91c1c;
+    font-weight: 900;
+}
+
+.result-push {
+    color: #92400e;
+    font-weight: 900;
+}
+
+.result-pending {
+    color: #6b7280;
+    font-weight: 800;
+}
+
+@media (max-width: 600px) {
+    body {
+        padding: 12px;
+    }
+
+    h1 {
+        font-size: 24px;
+    }
+
+    h2 {
+        font-size: 19px;
+    }
+
+    .section {
+        padding: 10px;
+    }
+
+    .data-table {
+        font-size: 12px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 6px;
+    }
+
+    .matchup {
+        font-size: 19px;
+    }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+    <h1>NBA 明日預測報告</h1>
+    <div class="subtitle">產生時間：2026-05-13 22:48:34｜預測日期：2026-05-14</div>
+
+    <h2>明日推薦</h2>
+    </div>
+
+    <div class="final-wrap">
+        
+        <div class="final-card final-main">
+            <div class="final-level">🔥 主推｜讓分</div>
+            <div class="final-game">騎士 vs 活塞</div>
+            <div class="final-pick">騎士 +3.5</div>
+            <div class="final-score">
+                信心：38/50｜
+                優勢：4.2 分｜
+                ⚠️ 可考慮
+            </div>
+
+            <div class="final-reason">
+                預測主隊分差 -0.7。客隊近10場：近10場 5勝5敗｜場均得分 108.3｜場均失分 108.8｜淨勝分 -0.5。
+            </div>
+        </div>
+        
+
+        <div class="final-card">
+            <div class="final-level">🥈 副推｜大小分</div>
+            <div class="final-game">騎士 vs 活塞</div>
+            <div class="final-pick">小分 212.5</div>
+            <div class="final-score">
+                信心：27/50｜
+                優勢：0.6 分｜
+                ❌ 不建議
+            </div>
+
+            <div class="final-reason">
+                預測總分 211.9。兩隊近10場節奏與防守偏保守。
+            </div>
+        </div>
+        
+    </div>
+
+    <h2>昨日驗證</h2>
+    <div class='verify-summary'>昨日 Top3：目前尚無已完賽結果｜主推：尚無結果</div>
+
+    <div class="section">
+        <table border="1" class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>日期</th>
+      <th>隊伍</th>
+      <th>比分</th>
+      <th>預測</th>
+      <th>預測結果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2026-05-13</td>
+      <td>灰狼 vs 馬刺</td>
+      <td>0-0</td>
+      <td>🔥 主推｜灰狼 +10.5</td>
+      <td><span class='result-pending'>⏳ 未完賽</span></td>
+    </tr>
+    <tr>
+      <td>2026-05-13</td>
+      <td>灰狼 vs 馬刺</td>
+      <td>0-0</td>
+      <td>🥈 副推｜大分 218.5</td>
+      <td><span class='result-pending'>⏳ 未完賽</span></td>
+    </tr>
+  </tbody>
+</table>
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <div class="label">主推（近 7 天）</div>
+            <div class="value">1/2（50.0%）</div>
+        </div>
+
+        <div class="card">
+            <div class="label">主推（近 30 天）</div>
+            <div class="value">1/2（50.0%）</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Top3（近 7 天）</div>
+            <div class="value">4/6（66.7%）</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Top3（近 30 天）</div>
+            <div class="value">4/6（66.7%）</div>
+        </div>
+
+        <div class="card">
+            <div class="label">總勝率（全部累積）</div>
+            <div class="value">4/6（66.7%）</div>
+        </div>
+    </div>
+
+    <details class="history-box">
+        <summary>📂 查看歷史推薦紀錄（最近 30 筆）</summary>
+        <div class="section" style="margin-top:14px;">
+            <table border="1" class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>日期</th>
+      <th>隊伍</th>
+      <th>比賽分數</th>
+      <th>預測</th>
+      <th>預測結果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2026-05-13</td>
+      <td>灰狼 vs 馬刺</td>
+      <td>0-0</td>
+      <td>🔥 主推｜灰狼 +10.5</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>2026-05-13</td>
+      <td>灰狼 vs 馬刺</td>
+      <td>0-0</td>
+      <td>🥈 副推｜大分 218.5</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>2026-05-11</td>
+      <td>馬刺 vs 灰狼</td>
+      <td>109-114</td>
+      <td>🔥 主推｜灰狼 +4.5</td>
+      <td>✅ 過</td>
+    </tr>
+    <tr>
+      <td>2026-05-11</td>
+      <td>尼克 vs 76人</td>
+      <td>144-114</td>
+      <td>🥈 副推｜76人 +1.5</td>
+      <td>❌ 沒過</td>
+    </tr>
+    <tr>
+      <td>2026-05-11</td>
+      <td>馬刺 vs 灰狼</td>
+      <td>109-114</td>
+      <td>🥉 副推｜大分 217.5</td>
+      <td>✅ 過</td>
+    </tr>
+    <tr>
+      <td>2026-05-10</td>
+      <td>雷霆 vs 湖人</td>
+      <td>131-108</td>
+      <td>🔥 主推｜湖人 +8.5</td>
+      <td>❌ 沒過</td>
+    </tr>
+    <tr>
+      <td>2026-05-10</td>
+      <td>雷霆 vs 湖人</td>
+      <td>131-108</td>
+      <td>🥈 副推｜大分 211.5</td>
+      <td>✅ 過</td>
+    </tr>
+    <tr>
+      <td>2026-05-10</td>
+      <td>活塞 vs 騎士</td>
+      <td>109-116</td>
+      <td>🥉 副推｜騎士 -4.5</td>
+      <td>✅ 過</td>
+    </tr>
+  </tbody>
+</table>
+        </div>
+    </details>
+
+    <h2>大小分 Top 3</h2>
+    <div class="section">
+        
+        <div class="top3-card">
+            <div class="top3-rank">#1 大小分</div>
+
+            <div class="top3-game">
+                騎士 vs 活塞
+            </div>
+
+            <div class="top3-pick">小分 212.5</div>
+
+            <div class="top3-info">
+                信心分數 27/50｜
+                優勢 0.6 分｜
+                ❌ 不建議
+            </div>
+        </div>
+        
+    </div>
+
+    <h2>讓分 Top 3</h2>
+    <div class="section">
+        
+        <div class="top3-card">
+            <div class="top3-rank">#1 讓分</div>
+
+            <div class="top3-game">
+                騎士 vs 活塞
+            </div>
+
+            <div class="top3-pick">騎士 +3.5</div>
+
+            <div class="top3-info">
+                信心分數 38/50｜
+                優勢 4.2 分｜
+                ⚠️ 可考慮
+            </div>
+        </div>
+        
+    </div>
+
+    <h2>每場預測</h2>
+    <div>
+        
+        <div class="game-card">
+            <div class="game-time">2026-05-14 08:00</div>
+            <div class="matchup">騎士 <span>vs</span> 活塞</div>
+            <div class="pick-grid">
+                <div class="pick-box main-pick">
+                    <div class="pick-label">大小分推薦</div>
+                    <div class="pick-value">小分 212.5</div>
+                    <div class="pick-note">27/50（低信心）｜優勢 0.6 分</div>
+                </div>
+                <div class="pick-box">
+                    <div class="pick-label">讓分推薦</div>
+                    <div class="pick-value">騎士 +3.5</div>
+                    <div class="pick-note">38/50（可考慮）｜優勢 4.2 分｜⚠️ 可考慮</div>
+                </div>
+            </div>
+            <div class="detail-line">
+                預測總分：211.9｜
+                預測主隊分差：-0.7
+            </div>
+
+            <div class="market-line">
+                主隊近10場：
+                近10場 6勝4敗｜場均得分 104.6｜場均失分 99.8｜淨勝分 +4.8
+            </div>
+
+            <div class="market-line">
+                客隊近10場：
+                近10場 5勝5敗｜場均得分 108.3｜場均失分 108.8｜淨勝分 -0.5
+            </div>
+
+            <div class="market-line">
+                主隊近況分數：
+                2.48｜
+                客隊近況分數：
+                -0.18
+            </div>
+
+            <div class="market-line">
+                市場判斷：
+                讓分盤有一方小幅優勢；大小分盤偏低，市場預期節奏慢或防守強。
+            </div>
+
+            <div class="market-line">
+                市場與預測：
+                讓分盤差距不大，市場方向不明顯。
+            </div>
+        </div>
+        
+    </div>
+</div>
+</body>
+</html>
