@@ -441,13 +441,20 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
     cache_df = load_espn_day_cache()
 
     if not cache_df.empty and "台灣日期" in cache_df.columns:
+
         cached_rows = cache_df[
             cache_df["台灣日期"].astype(str) == cache_key
         ].copy()
 
         if not cached_rows.empty:
-            ESPN_DAY_CACHE[cache_key] = cached_rows.copy()
-            return cached_rows
+
+            # 今天 / 昨天可能還在更新比分
+            # 不要直接使用舊 cache
+            if target_tw_date not in [TODAY_TW, YESTERDAY_TW]:
+
+                ESPN_DAY_CACHE[cache_key] = cached_rows.copy()
+
+                return cached_rows
 
     all_games = []
     check_dates = [
