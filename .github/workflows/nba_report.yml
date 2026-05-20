@@ -3,6 +3,7 @@ name: NBA Daily Report
 on:
   schedule:
     - cron: "30 0 * * *"
+    - cron: "30 4 * * *"
   workflow_dispatch:
 
 jobs:
