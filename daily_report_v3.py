@@ -867,32 +867,47 @@ def market_vs_prediction_text(home_spread, spread_pick, home_team, away_team, sp
     if home_spread is None:
         return "盤口不足，暫不判斷市場方向。"
 
-    # 判斷市場偏哪邊
-    if home_spread <= -6:
+    # ===== 判斷市場偏向 =====
+    if home_spread <= -7:
         market_side = "主隊"
-    elif home_spread >= 6:
+        market_strength = "明顯"
+    elif home_spread <= -3:
+        market_side = "主隊"
+        market_strength = "小幅"
+    elif home_spread >= 7:
         market_side = "客隊"
+        market_strength = "明顯"
+    elif home_spread >= 3:
+        market_side = "客隊"
+        market_strength = "小幅"
     else:
-        return "讓分盤差距不大，市場方向不明顯。"
+        return "市場方向接近五五波，暫不判斷順市場或反市場。"
 
-    # 判斷預測推薦哪邊
+    # ===== 判斷預測推薦方向 =====
     if str(home_team) in spread_pick:
         prediction_side = "主隊"
+        prediction_text = str(home_team)
     elif str(away_team) in spread_pick:
         prediction_side = "客隊"
+        prediction_text = str(away_team)
     else:
         return "暫不判斷市場與預測方向。"
 
-    # 判斷是否反市場
+    # ===== 反市場 / 順市場 =====
     if market_side != prediction_side:
         if spread_edge >= 6:
-            return f"🔥 強烈反市場（優勢 {spread_edge:.1f} 分）"
+            return f"🔥 強烈反市場：市場{market_strength}偏{market_side}，但預測支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
         elif spread_edge >= 3:
-            return f"⚠️ 反市場（優勢 {spread_edge:.1f} 分）"
+            return f"⚠️ 反市場：市場{market_strength}偏{market_side}，但預測支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
         else:
-            return "反市場但優勢不足。"
+            return f"反市場但優勢不足：市場{market_strength}偏{market_side}，預測支持{prediction_text}，但差距只有 {spread_edge:.1f} 分。"
 
-    return "市場方向與預測一致。"
+    if spread_edge >= 6:
+        return f"✅ 順市場高信心：市場{market_strength}偏{market_side}，預測也支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
+    elif spread_edge >= 3:
+        return f"順市場可考慮：市場{market_strength}偏{market_side}，預測也支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
+    else:
+        return f"順市場但優勢普通：市場{market_strength}偏{market_side}，預測也支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
 
 def market_bias_text(home_spread, total_line, predicted_home_margin, predicted_total):
     home_spread = safe_float(home_spread, None)
