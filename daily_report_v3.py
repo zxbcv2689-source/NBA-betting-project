@@ -498,6 +498,14 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
             status_type = competition.get("status", {}).get("type", {})
             completed = bool(status_type.get("completed", False))
             status_name = status_type.get("description", "")
+            state = str(status_type.get("state", "")).lower()
+
+            if completed:
+                live_status = "🔴 FINAL"
+            elif state == "in":
+                live_status = "🟢 LIVE"
+            else:
+                live_status = "⏳ Scheduled"
             notes = competition.get("notes", [])
             series_info = ""
 
@@ -539,6 +547,7 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
                 "home_score": home_score,
                 "completed": completed,
                 "status": status_name,
+                "live_status": live_status,
                 "series_info": series_info,
                 "espn_spread": spread,
                 "espn_total": total,
@@ -1765,6 +1774,14 @@ def simple_game_cards(predictions):
         cards.append(f"""
         <div class="game-card">
             <div class="game-time">{row.get('台灣開賽時間', '')}</div>
+            <div class="market-line">
+                狀態：
+                {row.get('live_status', '')}
+            </div>
+            <div class="market-line">
+                賽事資訊：
+                {row.get('series_info', '')}
+            </div>
             <div class="matchup">{short_name(row.get('客隊'))} <span>vs</span> {short_name(row.get('主隊'))}</div>
             <div class="pick-grid">
                 <div class="pick-box main-pick">
