@@ -25,7 +25,7 @@ jobs:
       - name: Run daily report
         run: python daily_report_v3.py
 
-              - name: Commit daily report
+      - name: Commit daily report
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
