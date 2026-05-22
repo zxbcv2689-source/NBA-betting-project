@@ -895,28 +895,59 @@ def market_vs_prediction_text(home_spread, spread_pick, home_team, away_team, sp
     return "市場方向與預測一致。"
 
 def market_bias_text(home_spread, total_line, predicted_home_margin, predicted_total):
-    if home_spread is None and total_line is None:
-        return "目前盤口不足，市場偏向暫不判斷。"
+    home_spread = safe_float(home_spread, None)
+    total_line = safe_float(total_line, None)
+    predicted_home_margin = safe_float(predicted_home_margin, 0)
+    predicted_total = safe_float(predicted_total, 0)
 
     parts = []
 
-    if home_spread is not None:
-        if home_spread <= -8:
-            parts.append("市場明顯偏主隊強勢")
-        elif home_spread >= 8:
-            parts.append("市場明顯偏客隊強勢")
-        elif abs(home_spread) <= 2:
-            parts.append("讓分盤接近五五波")
+    # ===== 讓分市場熱度 =====
+    if home_spread is None:
+        parts.append("讓分盤：盤口不足")
+    else:
+        if home_spread <= -7:
+            parts.append("讓分盤：市場明顯偏主隊")
+        elif home_spread <= -3:
+            parts.append("讓分盤：市場小幅偏主隊")
+        elif home_spread >= 7:
+            parts.append("讓分盤：市場明顯偏客隊")
+        elif home_spread >= 3:
+            parts.append("讓分盤：市場小幅偏客隊")
         else:
-            parts.append("讓分盤有一方小幅優勢")
+            parts.append("讓分盤：市場接近五五波")
+
+    # ===== 大小分市場熱度 =====
+    if total_line is None:
+        parts.append("大小分：盤口不足")
+    else:
+        if total_line >= 230:
+            parts.append("大小分：市場預期高比分")
+        elif total_line <= 215:
+            parts.append("大小分：市場預期低比分")
+        else:
+            parts.append("大小分：市場預期中等節奏")
+
+    # ===== 預測與市場差距 =====
+    if home_spread is not None:
+        home_cover_edge = predicted_home_margin + home_spread
+
+        if abs(home_cover_edge) >= 6:
+            parts.append(f"讓分差距：預測與盤口差距明顯（{abs(home_cover_edge):.1f} 分）")
+        elif abs(home_cover_edge) >= 3:
+            parts.append(f"讓分差距：預測與盤口有差距（{abs(home_cover_edge):.1f} 分）")
+        else:
+            parts.append("讓分差距：預測與盤口接近")
 
     if total_line is not None:
-        if total_line >= 230:
-            parts.append("大小分盤偏高，市場預期節奏快或進攻效率高")
-        elif total_line <= 215:
-            parts.append("大小分盤偏低，市場預期節奏慢或防守強")
+        total_edge = predicted_total - total_line
+
+        if abs(total_edge) >= 8:
+            parts.append(f"大小分差距：預測與盤口差距明顯（{abs(total_edge):.1f} 分）")
+        elif abs(total_edge) >= 4:
+            parts.append(f"大小分差距：預測與盤口有差距（{abs(total_edge):.1f} 分）")
         else:
-            parts.append("大小分盤在中間區間")
+            parts.append("大小分差距：預測與盤口接近")
 
     return "；".join(parts) + "。"
 
