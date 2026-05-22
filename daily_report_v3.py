@@ -498,6 +498,17 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
             status_type = competition.get("status", {}).get("type", {})
             completed = bool(status_type.get("completed", False))
             status_name = status_type.get("description", "")
+            notes = competition.get("notes", [])
+            series_info = ""
+
+            if notes:
+                note_texts = []
+                for note in notes:
+                    headline = str(note.get("headline", "")).strip()
+                    if headline:
+                        note_texts.append(headline)
+
+                series_info = "｜".join(note_texts)
 
             home_team = home.get("team", {})
             away_team = away.get("team", {})
@@ -528,6 +539,7 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
                 "home_score": home_score,
                 "completed": completed,
                 "status": status_name,
+                "series_info": series_info,
                 "espn_spread": spread,
                 "espn_total": total,
                 "espn_odds_details": odds_details,
