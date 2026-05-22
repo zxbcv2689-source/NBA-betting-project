@@ -3,3 +3,7 @@ data/*.csv
 logs/
 old_versions/
 *_backup*
+.DS_Store
+__pycache__/
+*.pyc
+output/
