@@ -1,5 +1,4 @@
 ﻿game_id,台灣開賽時間,台灣日期,客隊,主隊,客隊縮寫,主隊縮寫,away_score,home_score,completed,status,espn_spread,espn_total,espn_odds_details,live_status,series_info
-401873199,2026-05-23 08:30,2026-05-23,Oklahoma City Thunder,San Antonio Spurs,OKC,SA,0,0,False,Scheduled,-1.5,217.5,SA -1.5,,
 401873198,2026-05-21 08:30,2026-05-21,San Antonio Spurs,Oklahoma City Thunder,SA,OKC,113,122,True,Final,,,,,
 401873341,2026-05-20 08:00,2026-05-20,Cleveland Cavaliers,New York Knicks,CLE,NY,104,115,True,Final,,,,,
 401873197,2026-05-19 08:30,2026-05-19,San Antonio Spurs,Oklahoma City Thunder,SA,OKC,122,115,True,Final,,,,,
@@ -251,3 +250,4 @@
 401873343,2026-05-24 08:00,2026-05-24,New York Knicks,Cleveland Cavaliers,NY,CLE,0,0,False,Scheduled,-2.5,213.5,CLE -2.5,⏳ Scheduled,East Finals - Game 3
 401873342,2026-05-22 08:00,2026-05-22,Cleveland Cavaliers,New York Knicks,CLE,NY,93,109,True,Final,,,,🔴 FINAL,East Finals - Game 2
 401873199,2026-05-23 08:30,2026-05-23,Oklahoma City Thunder,San Antonio Spurs,OKC,SA,0,0,False,Scheduled,-1.5,218.5,SA -1.5,⏳ Scheduled,West Finals - Game 3
+401873199,2026-05-23 08:30,2026-05-23,Oklahoma City Thunder,San Antonio Spurs,OKC,SA,0,0,False,Scheduled,-2.5,218.5,SA -2.5,⏳ Scheduled,West Finals - Game 3
