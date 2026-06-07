@@ -20,6 +20,53 @@ from pathlib import Path
 HISTORY_CSV = Path("nba_pick_history.csv")
 from datetime import datetime, timedelta, timezone
 
+# =========================
+# 信心分數設定
+# =========================
+
+MAIN_PICK_MIN_CONFIDENCE = 72  # 主推最低門檻：低於 72% 就不硬推主推
+
+
+def confidence_to_percent(score):
+    """
+    把舊版 /50 信心分數轉成 0~100%
+    例如：
+    49 -> 98%
+    "49/50" -> 98%
+    "86%" -> 86%
+    """
+    if score is None:
+        return 0
+
+    text = str(score).strip()
+
+    if "/" in text:
+        left, right = text.split("/", 1)
+        try:
+            return round(float(left) / float(right) * 100)
+        except Exception:
+            return 0
+
+    text = text.replace("%", "")
+
+    try:
+        number = float(text)
+    except Exception:
+        return 0
+
+    if number <= 50:
+        return round(number / 50 * 100)
+
+    return round(number)
+
+
+def format_confidence(score):
+    return f"{confidence_to_percent(score)}%"
+
+
+def is_main_pick_confident(score):
+    return confidence_to_percent(score) >= MAIN_PICK_MIN_CONFIDENCE
+
 
 # =========================
 # 基本設定
@@ -722,16 +769,20 @@ def predict_game(row):
     home_form = recent_form["home_form"]
     away_form = recent_form["away_form"]
 
-    home_form_edge = recent_form["home_form_edge"]
+    raw_home_form_edge = recent_form["home_form_edge"]
 
     # ===== 主場優勢 =====
-    home_advantage = 2.5
+    home_advantage = 2.0
+
+    # ===== 近況修正：不要吃滿，避免短期近況誤導 =====
+    form_edge = raw_home_form_edge * 0.45
+    form_edge = max(-3.0, min(3.0, form_edge))
 
     # ===== 最終預測分差 =====
     predicted_home_margin = (
         (home_power - away_power)
         + home_advantage
-        + home_form_edge
+        + form_edge
     )
 
     # ===== 預測總分 =====
@@ -742,7 +793,6 @@ def predict_game(row):
     else:
         base_total = 220
 
-    # 近期進攻 / 防守影響
     offense_adjust = (
         (
             home_form["avg_score"]
@@ -757,11 +807,15 @@ def predict_game(row):
         ) / 2
     ) - 112
 
-    predicted_total = (
-        base_total
-        + (offense_adjust * 0.60)
-        - (defense_adjust * 0.35)
+    # 大小分修正也要保守，避免每場都看起來有明顯方向
+    total_adjust = (
+        offense_adjust * 0.35
+        - defense_adjust * 0.20
     )
+
+    total_adjust = max(-5.0, min(5.0, total_adjust))
+
+    predicted_total = base_total + total_adjust
 
     # ===== 盤口 =====
     home_spread = safe_float(row.get("home_spread"), None)
@@ -774,7 +828,6 @@ def predict_game(row):
 
         spread_pick = "無盤口"
         spread_edge = 0
-
         spread_reason = "目前沒有讓分盤。"
 
     else:
@@ -784,11 +837,11 @@ def predict_game(row):
         if home_cover_edge > 0:
 
             spread_pick = f"{row['主隊']} {home_spread:+.1f}"
-
             spread_edge = abs(home_cover_edge)
 
             spread_reason = (
                 f"預測主隊分差 {predicted_home_margin:.1f}。"
+                f"近況修正後優勢 {form_edge:+.1f}。"
                 f"主隊近10場：{home_form['summary']}。"
             )
 
@@ -797,11 +850,11 @@ def predict_game(row):
             away_spread = -home_spread
 
             spread_pick = f"{row['客隊']} {away_spread:+.1f}"
-
             spread_edge = abs(home_cover_edge)
 
             spread_reason = (
                 f"預測主隊分差 {predicted_home_margin:.1f}。"
+                f"近況修正後優勢 {form_edge:+.1f}。"
                 f"客隊近10場：{away_form['summary']}。"
             )
 
@@ -812,7 +865,6 @@ def predict_game(row):
 
         total_pick = "無盤口"
         total_edge = 0
-
         total_reason = "目前沒有大小分盤。"
 
     else:
@@ -822,22 +874,22 @@ def predict_game(row):
         if diff >= 0:
 
             total_pick = f"大分 {total_line:.1f}"
-
             total_edge = abs(diff)
 
             total_reason = (
                 f"預測總分 {predicted_total:.1f}。"
-                f"兩隊近10場進攻效率偏高。"
+                f"總分修正 {total_adjust:+.1f}。"
+                f"兩隊近10場進攻狀態偏高。"
             )
 
         else:
 
             total_pick = f"小分 {total_line:.1f}"
-
             total_edge = abs(diff)
 
             total_reason = (
                 f"預測總分 {predicted_total:.1f}。"
+                f"總分修正 {total_adjust:+.1f}。"
                 f"兩隊近10場節奏與防守偏保守。"
             )
 
@@ -1208,6 +1260,79 @@ def calculate_win_rates():
         return output
 
     today = TODAY_TW
+    all_verified = []
+
+    for d in log["預測目標日期"].dropna().unique():
+        try:
+            d = pd.to_datetime(d).date()
+
+            if d > today:
+                continue
+
+            verified = verify_predictions_for_date(d)
+
+            if not verified.empty:
+                verified["預測日期"] = str(d)
+                all_verified.append(verified)
+
+        except Exception:
+            continue
+
+    if not all_verified:
+        return output
+
+    all_df = pd.concat(all_verified, ignore_index=True)
+
+    if "推薦等級" in all_df.columns:
+        all_df = all_df[
+            all_df["推薦等級"]
+            .fillna("")
+            .astype(str)
+            .str.contains("主推|副推", na=False)
+        ].copy()
+
+    if "結果" in all_df.columns:
+        all_df = all_df[
+            all_df["結果"]
+            .fillna("")
+            .astype(str)
+            .str.contains("過|沒過", na=False)
+        ].copy()
+
+    if all_df.empty:
+        return output
+
+    # 日期舊到新排序，再取最後 N 筆
+    if "預測日期" in all_df.columns:
+        all_df["排序日期"] = pd.to_datetime(all_df["預測日期"], errors="coerce")
+        all_df = all_df.sort_values("排序日期").drop(columns=["排序日期"])
+
+    for label, count in {"7": 7, "30": 30}.items():
+        recent_df = all_df.tail(count).copy()
+
+        output[f"main_{label}"] = format_final_pick_rate(
+            recent_df,
+            only_main=True
+        )
+
+        output[f"top3_{label}"] = format_final_pick_rate(
+            recent_df,
+            only_main=False
+        )
+
+        output[f"overall_{label}"] = format_final_pick_rate(
+            recent_df,
+            only_main=False
+        )
+
+    output["overall_all"] = format_final_pick_rate(
+        all_df,
+        only_main=False
+    )
+
+    return output
+
+    today = TODAY_TW
     windows = {"7": 7, "30": 30}
 
     for label, days in windows.items():
@@ -1459,34 +1584,49 @@ def df_to_html_table(df, columns=None):
 
 def confidence_score(edge):
     """
-    把優勢分數轉成 0～50 的信心分數
-    防止 NaN 造成程式報錯
+    把優勢分數轉成 0～100% 的信心分數
+
+    重點：
+    - 不再用 /50
+    - 分數不要太容易灌高
+    - 小優勢只給普通信心
+    - 明顯優勢才會超過 65%
     """
+    if edge is None:
+        return 50
 
-    try:
-        edge = float(edge)
-    except:
-        edge = 0
+    edge = abs(float(edge))
 
-    # 如果是 NaN，直接當成 0
-    if pd.isna(edge):
-        edge = 0
-
-    score = 25 + edge * 3
-
-    score = max(0, min(50, round(score)))
+    if edge < 1:
+        score = 52
+    elif edge < 2:
+        score = 55
+    elif edge < 3:
+        score = 58
+    elif edge < 4:
+        score = 61
+    elif edge < 5:
+        score = 64
+    elif edge < 6:
+        score = 67
+    elif edge < 7:
+        score = 70
+    else:
+        score = 73
 
     return score
 
 
 def confidence_label(score):
-    if score >= 45:
+    score = confidence_to_percent(score)
+
+    if score >= 70:
         return "高信心"
-    if score >= 38:
+    if score >= 64:
         return "可考慮"
-    if score >= 30:
-        return "觀察"
-    return "低信心"
+    if score >= 58:
+        return "低信心"
+    return "不推薦"
 
 def final_level_display(level):
     level = str(level)
@@ -1680,7 +1820,7 @@ def build_final_recommendations(predictions):
                 "台灣開賽時間": row.get("台灣開賽時間", ""),
                 "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
                 "推薦": row.get("大小分推薦", ""),
-                "信心分數": f"{score}/50",
+                "信心分數": f"{score}%",
                 "信心分數數值": score,
                 "預測優勢": edge,
                 "理由": row.get("大小分理由", ""),
@@ -1700,7 +1840,7 @@ def build_final_recommendations(predictions):
                 "台灣開賽時間": row.get("台灣開賽時間", ""),
                 "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
                 "推薦": row.get("讓分推薦", ""),
-                "信心分數": f"{score}/50",
+                "信心分數": f"{score}%",
                 "信心分數數值": score,
                 "預測優勢": edge,
                 "理由": row.get("讓分理由", ""),
@@ -2432,22 +2572,22 @@ h2 {{
 
     <div class="cards">
         <div class="card">
-            <div class="label">主推（近 7 天）</div>
+            <div class="label">主推（近 7 筆）</div>
             <div class="value">{win_rates.get('main_7')}</div>
         </div>
 
         <div class="card">
-            <div class="label">主推（近 30 天）</div>
+            <div class="label">主推（近 30 筆）</div>
             <div class="value">{win_rates.get('main_30')}</div>
         </div>
 
         <div class="card">
-            <div class="label">Top3（近 7 天）</div>
+            <div class="label">Top3（近 7 筆）</div>
             <div class="value">{win_rates.get('top3_7')}</div>
         </div>
 
         <div class="card">
-            <div class="label">Top3（近 30 天）</div>
+            <div class="label">Top3（近 30 筆）</div>
             <div class="value">{win_rates.get('top3_30')}</div>
         </div>
 

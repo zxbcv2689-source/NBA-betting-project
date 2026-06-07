@@ -5,9 +5,11 @@ permissions:
 
 on:
   schedule:
-    - cron: "30 0 * * *"
-    - cron: "30 4 * * *"
-    - cron: "30 7 * * *"
+    - cron: "30 0 * * *"   # 台灣 08:30 初盤觀察
+    - cron: "30 6 * * *"   # 台灣 14:30 傷兵更新版
+    - cron: "30 12 * * *"  # 台灣 20:30 晚間觀察
+    - cron: "30 21 * * *"  # 台灣 05:30 最終版
+    - cron: "30 23 * * *"  # 台灣 07:30 開賽前更新
   workflow_dispatch:
 
 concurrency:
