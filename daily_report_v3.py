@@ -7,7 +7,7 @@
 # 4. 大小分 / 讓分候選排行
 # 5. 市場偏向
 # 6. 昨日驗證
-# 7. 7天 / 30天勝率
+# 7. 近 7 筆 / 近 30 筆勝率
 # 8. HTML 報告
 
 import os
@@ -113,6 +113,9 @@ REPORT_DIR.mkdir(exist_ok=True)
 PREDICTION_LOG_CSV = DATA_DIR / "prediction_log_v3.csv"
 ESPN_DAY_CACHE_CSV = DATA_DIR / "espn_day_cache.csv"
 RECENT_GAMES_CACHE_CSV = DATA_DIR / "recent_games_cache.csv"
+LINE_SNAPSHOT_CSV = DATA_DIR / "line_snapshots.csv"
+INJURY_ADJUSTMENTS_CSV = DATA_DIR / "injury_adjustments.csv"
+AUTO_INJURY_ADJUSTMENTS_CSV = DATA_DIR / "auto_injury_adjustments.csv"
 REPORT_HTML = REPORT_DIR / "daily_report_v3.html"
 
 TODAY_TW = datetime.now(TAIWAN_TZ).date()
@@ -126,6 +129,15 @@ ESPN_DAY_CACHE = {}
 # export THE_ODDS_API_KEY="你的key"
 THE_ODDS_API_KEY = os.getenv("THE_ODDS_API_KEY", "").strip()
 THE_ODDS_API_URL = "https://api.the-odds-api.com/v4/sports/basketball_nba/odds"
+
+NBA_ABBR_FIX = {
+    "NY": "NYK",
+    "SA": "SAS",
+    "GS": "GSW",
+    "NO": "NOP",
+    "UTAH": "UTA",
+}
+
 
 # =========================
 # 小工具
@@ -280,6 +292,7 @@ def get_recent_games_cache(today_tw):
     # ===== 先讀永久 cache =====
     cache_df = load_recent_games_cache()
 
+    # ✅ 穩定優先：只要有舊快取，就先使用，避免 ESPN 卡住導致整份報告不更新
     if not cache_df.empty:
         cache_time = datetime.fromtimestamp(
             RECENT_GAMES_CACHE_CSV.stat().st_mtime
@@ -289,17 +302,19 @@ def get_recent_games_cache(today_tw):
 
         if cache_time == today_date:
             print("已載入今日 recent_games_cache.csv")
-            RECENT_GAMES_CACHE = cache_df
-            print("近況資料筆數：", len(RECENT_GAMES_CACHE))
-            return RECENT_GAMES_CACHE
+        else:
+            print(f"已載入舊 recent_games_cache.csv（{cache_time}），先用舊快取避免 ESPN 卡住")
 
-    # ===== 沒有今日 cache，就重新建立 =====
+        RECENT_GAMES_CACHE = cache_df
+        print("近況資料筆數：", len(RECENT_GAMES_CACHE))
+        return RECENT_GAMES_CACHE
+
+    # ===== 完全沒有 cache，才重新建立 =====
     print("正在建立近10場共用資料快取...")
     RECENT_GAMES_CACHE = build_recent_games_cache(today_tw)
 
     print("近況資料筆數：", len(RECENT_GAMES_CACHE))
 
-    # ===== 儲存永久 cache =====
     try:
         RECENT_GAMES_CACHE.to_csv(
             RECENT_GAMES_CACHE_CSV,
@@ -414,6 +429,57 @@ def calc_recent_10_team_form(team_name, today_tw):
         "form_score": form_score,
         "summary": f"近{games}場 {wins}勝{games - wins}敗｜場均得分 {avg_score:.1f}｜場均失分 {avg_allowed:.1f}｜淨勝分 {avg_margin:+.1f}",
     }
+
+
+def calc_home_away_form_edge(home_team, away_team, today_tw):
+    """
+    主場隊最近主場表現
+    客場隊最近客場表現
+
+    回傳：
+    {
+        "home_edge": x
+    }
+    """
+
+    recent_games = get_recent_games_cache(today_tw)
+
+    if recent_games is None or recent_games.empty:
+        return {"home_edge": 0}
+
+    # 主隊最近主場
+    home_games = recent_games[
+        recent_games["主隊"].astype(str) == str(home_team)
+    ].head(10)
+
+    # 客隊最近客場
+    away_games = recent_games[
+        recent_games["客隊"].astype(str) == str(away_team)
+    ].head(10)
+
+    home_margin = 0
+    away_margin = 0
+
+    if not home_games.empty:
+        home_margin = (
+            home_games["home_score"] -
+            home_games["away_score"]
+        ).mean()
+
+    if not away_games.empty:
+        away_margin = (
+            away_games["away_score"] -
+            away_games["home_score"]
+        ).mean()
+
+    edge = safe_float(home_margin, 0) - safe_float(away_margin, 0)
+
+    edge = max(-5, min(5, edge))
+
+    return {
+        "home_edge": round(edge, 2)
+    }
+
 
 def calc_recent_10_matchup_adjustment(away_team, home_team, today_tw):
     away_form = calc_recent_10_team_form(away_team, today_tw)
@@ -622,11 +688,6 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
         save_espn_day_cache(combined_cache)
 
     return df
-    df = df.drop_duplicates(subset=["game_id"]).sort_values("台灣開賽時間").reset_index(drop=True)
-
-    ESPN_DAY_CACHE[cache_key] = df.copy()
-
-    return df
 
 
 # =========================
@@ -731,7 +792,7 @@ def merge_lines(games_df):
 # 簡易模型：乾淨穩定版
 # =========================
 
-def get_team_power(team_abbr):
+def get_team_power_v3_base(team_abbr):
     """簡易隊伍強度基準。
 
     這不是最終精準模型，而是乾淨版 v3 的穩定底座。
@@ -746,299 +807,742 @@ def get_team_power(team_abbr):
         "UTA": 1.5, "POR": 1.0, "CHA": 0.8, "DET": 0.6, "WAS": 0.5,
     }
     return power_map.get(str(team_abbr).upper(), 3.0)
-def get_recent_adjustment(team_abbr):
+
+
+def load_recent_games_for_power():
+    """讀取近期比賽資料，給 V4 動態強度使用。失敗時回傳空表。"""
+    from pathlib import Path
+
+    candidates = [
+        DATA_DIR / "recent_games_cache.csv",
+        DATA_DIR / "espn_day_cache.csv",
+    ]
+
+    frames = []
+
+    for file_path in candidates:
+        try:
+            if Path(file_path).exists():
+                df = pd.read_csv(file_path)
+                if not df.empty:
+                    frames.append(df)
+        except Exception:
+            continue
+
+    if not frames:
+        return pd.DataFrame()
+
+    df = pd.concat(frames, ignore_index=True)
+
+    if "game_id" in df.columns:
+        df["game_id"] = df["game_id"].astype(str)
+        df = df.drop_duplicates(subset=["game_id"], keep="last")
+
+    return df
+
+
+def calculate_recent_power_adjust(team_abbr, max_games=10):
+    """用近期比賽結果計算強度修正。支援縮寫與球隊全名。"""
+    df = load_recent_games_for_power()
+
+    if df.empty:
+        return 0.0
+
+    abbr_to_name = {
+        "ATL": "Atlanta Hawks", "BOS": "Boston Celtics", "BKN": "Brooklyn Nets",
+        "CHA": "Charlotte Hornets", "CHI": "Chicago Bulls", "CLE": "Cleveland Cavaliers",
+        "DAL": "Dallas Mavericks", "DEN": "Denver Nuggets", "DET": "Detroit Pistons",
+        "GSW": "Golden State Warriors", "HOU": "Houston Rockets", "IND": "Indiana Pacers",
+        "LAC": "LA Clippers", "LAL": "Los Angeles Lakers", "MEM": "Memphis Grizzlies",
+        "MIA": "Miami Heat", "MIL": "Milwaukee Bucks", "MIN": "Minnesota Timberwolves",
+        "NOP": "New Orleans Pelicans", "NYK": "New York Knicks", "OKC": "Oklahoma City Thunder",
+        "ORL": "Orlando Magic", "PHI": "Philadelphia 76ers", "PHX": "Phoenix Suns",
+        "POR": "Portland Trail Blazers", "SAC": "Sacramento Kings", "SAS": "San Antonio Spurs",
+        "TOR": "Toronto Raptors", "UTA": "Utah Jazz", "WAS": "Washington Wizards",
+    }
+
+    team_name = abbr_to_name.get(str(team_abbr).strip(), str(team_abbr).strip())
+
+    if "completed" in df.columns:
+        completed_text = df["completed"].astype(str).str.lower()
+        keep_completed = completed_text.isin(["true", "1", "yes"])
+        keep_unknown = df["completed"].isna()
+        df = df[keep_completed | keep_unknown].copy()
+
+    df["home_score"] = pd.to_numeric(df.get("home_score"), errors="coerce")
+    df["away_score"] = pd.to_numeric(df.get("away_score"), errors="coerce")
+    df = df.dropna(subset=["home_score", "away_score"])
+
+    if "台灣開賽時間" in df.columns:
+        df["_sort_time"] = pd.to_datetime(df["台灣開賽時間"], errors="coerce")
+        df = df.sort_values("_sort_time", ascending=False)
+    elif "台灣日期" in df.columns:
+        df["_sort_time"] = pd.to_datetime(df["台灣日期"], errors="coerce")
+        df = df.sort_values("_sort_time", ascending=False)
+
+    games = []
+
+    for _, row in df.iterrows():
+        home_abbr = str(row.get("主隊縮寫", "")).strip()
+        away_abbr = str(row.get("客隊縮寫", "")).strip()
+        home_name = str(row.get("主隊", "")).strip()
+        away_name = str(row.get("客隊", "")).strip()
+
+        home_score = safe_float(row.get("home_score"), None)
+        away_score = safe_float(row.get("away_score"), None)
+
+        if home_score is None or away_score is None:
+            continue
+
+        is_home = team_abbr == home_abbr or team_name == home_name
+        is_away = team_abbr == away_abbr or team_name == away_name
+
+        if is_home:
+            margin = home_score - away_score
+            scored = home_score
+            allowed = away_score
+        elif is_away:
+            margin = away_score - home_score
+            scored = away_score
+            allowed = home_score
+        else:
+            continue
+
+        games.append({
+            "margin": margin,
+            "scored": scored,
+            "allowed": allowed,
+            "win": 1 if margin > 0 else 0,
+        })
+
+        if len(games) >= max_games:
+            break
+
+    if len(games) < 3:
+        return 0.0
+
+    gdf = pd.DataFrame(games)
+
+    avg_margin = gdf["margin"].mean()
+    win_rate = gdf["win"].mean()
+    avg_scored = gdf["scored"].mean()
+    avg_allowed = gdf["allowed"].mean()
+
+    margin_part = avg_margin * 0.45
+    win_part = (win_rate - 0.5) * 8.0
+    offense_defense_part = (avg_scored - avg_allowed) * 0.05
+
+    adjust = margin_part + win_part + offense_defense_part
+
+    return round(max(min(adjust, 5.0), -5.0), 2)
+
+
+def get_team_power(team_abbr):
+    """V4-3：降低固定強度依賴，提高近期資料影響。
+
+    固定強度只保留 25% 當保底參考。
+    主要依靠近10場與近30場自動更新，減少人工維護。
     """
-    保留這個函式名稱，避免其他地方如果有用到會壞掉。
-    近10場狀態現在改由 calc_recent_10_matchup_adjustment() 處理。
+    base_power = get_team_power_v3_base(team_abbr)
+
+    short_adjust = calculate_recent_power_adjust(team_abbr, max_games=10)
+    medium_adjust = calculate_recent_power_adjust(team_abbr, max_games=30)
+
+    dynamic_power = (short_adjust * 0.65) + (medium_adjust * 0.35)
+    dynamic_power = max(min(dynamic_power, 6.0), -6.0)
+
+    final_power = (base_power * 0.25) + dynamic_power
+
+    return round(final_power, 2)
+
+
+
+
+
+def injury_status_weight(status_text):
+    status_text = str(status_text).lower()
+
+    if "out" in status_text:
+        return -2.0
+    if "doubtful" in status_text:
+        return -1.5
+    if "questionable" in status_text:
+        return -0.8
+    if "day-to-day" in status_text or "day to day" in status_text:
+        return -0.5
+
+    return 0.0
+
+
+def fetch_auto_injury_adjustments(target_tw_date):
     """
-    return 0
+    自動傷兵抓取入口。
+    目前先嘗試從 ESPN scoreboard 的 competitors 裡讀取 injuries。
+    如果資料源沒有提供 injuries，就回傳空表，不影響主程式。
+    """
+    rows = []
+    check_dates = [
+        target_tw_date - timedelta(days=1),
+        target_tw_date,
+        target_tw_date + timedelta(days=1),
+    ]
+
+    for d in check_dates:
+        params = {"dates": espn_date(d)}
+
+        try:
+            data = request_json(ESPN_SCOREBOARD_URL, params=params)
+        except Exception as e:
+            print(f"自動傷兵抓取失敗：{d}，原因：{e}")
+            continue
+
+        for event in data.get("events", []):
+            competition = event.get("competitions", [{}])[0]
+            competitors = competition.get("competitors", [])
+
+            start_tw = parse_espn_datetime_to_taiwan(event.get("date"))
+            if not start_tw or start_tw.date() != target_tw_date:
+                continue
+
+            for c in competitors:
+                team = c.get("team", {})
+                team_abbr = str(team.get("abbreviation", "")).strip().upper()
+                team_abbr = NBA_ABBR_FIX.get(team_abbr, team_abbr)
+                team_name = str(team.get("displayName", "")).strip()
+
+                injuries = c.get("injuries", []) or []
+
+                total_adjust = 0.0
+                notes = []
+
+                for injury in injuries:
+                    athlete = injury.get("athlete", {}) or {}
+                    player_name = str(athlete.get("displayName", "")).strip()
+                    status = str(injury.get("status", "")).strip()
+                    detail = str(injury.get("details", "")).strip()
+
+                    weight = injury_status_weight(status)
+
+                    if weight != 0:
+                        total_adjust += weight
+
+                    note_parts = [x for x in [player_name, status, detail] if x]
+                    if note_parts:
+                        notes.append(" / ".join(note_parts))
+
+                # 避免單隊自動傷兵扣太誇張，先限制在 -5 到 +0
+                total_adjust = max(-5.0, min(0.0, total_adjust))
+
+                rows.append({
+                    "team_abbr": team_abbr,
+                    "team_name": team_name,
+                    "adjust": round(total_adjust, 2),
+                    "note": "；".join(notes) if notes else "ESPN 未提供傷兵資料",
+                    "source": "espn_scoreboard",
+                    "created_at": tw_now_text(),
+                })
+
+    df = pd.DataFrame(rows)
+
+    if df.empty:
+        return df
+
+    df = df.drop_duplicates(subset=["team_abbr"], keep="last")
+    return df
+
+
+def save_auto_injury_adjustments(target_tw_date):
+    df = fetch_auto_injury_adjustments(target_tw_date)
+
+    if df is None or df.empty:
+        print("自動傷兵：目前沒有抓到資料")
+        return pd.DataFrame()
+
+    df.to_csv(
+        AUTO_INJURY_ADJUSTMENTS_CSV,
+        index=False,
+        encoding="utf-8-sig"
+    )
+
+    print("自動傷兵已儲存：", AUTO_INJURY_ADJUSTMENTS_CSV)
+    return df
+
+
+def get_auto_injury_adjustment(team_abbr):
+    """
+    自動傷兵修正。
+    檔案位置：data/auto_injury_adjustments.csv
+    """
+    if not AUTO_INJURY_ADJUSTMENTS_CSV.exists():
+        return {"adjust": 0.0, "note": "無自動傷兵資料"}
+
+    try:
+        df = pd.read_csv(AUTO_INJURY_ADJUSTMENTS_CSV)
+    except Exception:
+        return {"adjust": 0.0, "note": "自動傷兵檔讀取失敗"}
+
+    required_cols = {"team_abbr", "adjust", "note"}
+
+    if not required_cols.issubset(set(df.columns)):
+        return {"adjust": 0.0, "note": "自動傷兵檔欄位不完整"}
+
+    team_abbr = str(team_abbr).strip().upper()
+
+    matched = df[
+        df["team_abbr"].astype(str).str.strip().str.upper() == team_abbr
+    ]
+
+    if matched.empty:
+        return {"adjust": 0.0, "note": "無自動傷兵資料"}
+
+    row = matched.iloc[0]
+
+    return {
+        "adjust": safe_float(row.get("adjust"), 0.0),
+        "note": str(row.get("note", "")).strip() or "無備註",
+    }
+
+
+def get_combined_injury_adjustment(team_abbr):
+    """
+    合併手動傷兵 + 自動傷兵。
+    手動資料優先，但自動資料也會一起納入。
+    """
+    manual = get_manual_injury_adjustment(team_abbr)
+    auto = get_auto_injury_adjustment(team_abbr)
+
+    manual_adjust = safe_float(manual.get("adjust"), 0.0)
+    auto_adjust = safe_float(auto.get("adjust"), 0.0)
+
+    total_adjust = manual_adjust + auto_adjust
+    total_adjust = max(-6.0, min(3.0, total_adjust))
+
+    notes = []
+
+    manual_note = str(manual.get("note", "")).strip()
+    auto_note = str(auto.get("note", "")).strip()
+
+    if manual_note:
+        notes.append("手動：" + manual_note)
+
+    if auto_note:
+        notes.append("自動：" + auto_note)
+
+    return {
+        "adjust": round(total_adjust, 2),
+        "note": "｜".join(notes) if notes else "無傷兵修正",
+    }
+
+
+def get_manual_injury_adjustment(team_abbr):
+    """
+    手動傷兵修正。
+    檔案位置：data/injury_adjustments.csv
+
+    CSV 格式：
+    team_abbr,adjust,note
+    NYK,-2.5,主力缺陣
+    SAS,1.0,主力回歸
+    """
+    if not INJURY_ADJUSTMENTS_CSV.exists():
+        return {"adjust": 0.0, "note": "無手動傷兵修正"}
+
+    try:
+        df = pd.read_csv(INJURY_ADJUSTMENTS_CSV)
+    except Exception:
+        return {"adjust": 0.0, "note": "傷兵修正檔讀取失敗"}
+
+    required_cols = {"team_abbr", "adjust", "note"}
+
+    if not required_cols.issubset(set(df.columns)):
+        return {"adjust": 0.0, "note": "傷兵修正檔欄位不完整"}
+
+    team_abbr = str(team_abbr).strip().upper()
+
+    matched = df[
+        df["team_abbr"].astype(str).str.strip().str.upper() == team_abbr
+    ]
+
+    if matched.empty:
+        return {"adjust": 0.0, "note": "無手動傷兵修正"}
+
+    row = matched.iloc[0]
+
+    return {
+        "adjust": safe_float(row.get("adjust"), 0.0),
+        "note": str(row.get("note", "")).strip() or "無備註",
+    }
+
+def save_line_snapshots(predictions):
+    """V5-1：保存每次執行時的盤口快照。
+
+    之後用來比較：
+    - 晚上盤口
+    - 凌晨盤口
+    - 早上盤口
+
+    這才是真正的盤口變動資料。
+    """
+    if predictions is None or predictions.empty:
+        return
+
+    keep_cols = [
+        "game_id", "台灣開賽時間", "預測目標日期",
+        "客隊", "主隊", "客隊縮寫", "主隊縮寫",
+        "home_spread", "away_spread", "total",
+        "home_spread_api", "total_api",
+        "espn_spread", "espn_total",
+    ]
+
+    rows = predictions[[c for c in keep_cols if c in predictions.columns]].copy()
+
+    if rows.empty:
+        return
+
+    rows["snapshot_time"] = tw_now_text()
+    rows["snapshot_date"] = str(TODAY_TW)
+
+    old = pd.DataFrame()
+
+    if LINE_SNAPSHOT_CSV.exists():
+        try:
+            old = pd.read_csv(LINE_SNAPSHOT_CSV)
+        except Exception:
+            old = pd.DataFrame()
+
+    combined = pd.concat([old, rows], ignore_index=True)
+
+    # 同一場、同一時間執行，只保留最後一筆，避免手動連按造成重複
+    dedupe_cols = [
+        c for c in ["game_id", "snapshot_time"]
+        if c in combined.columns
+    ]
+
+    if dedupe_cols:
+        combined = combined.drop_duplicates(subset=dedupe_cols, keep="last")
+
+    combined.to_csv(LINE_SNAPSHOT_CSV, index=False, encoding="utf-8-sig")
+
+
+def add_line_movement_columns(predictions):
+    """V5-2：讀取 line_snapshots.csv，計算盤口變動。
+
+    目前只新增欄位，不影響推薦分數：
+    - 開盤主隊讓分
+    - 最新主隊讓分
+    - 主隊讓分變動
+    - 開盤大小分
+    - 最新大小分
+    - 大小分變動
+    - 盤口變動摘要
+    """
+    if predictions is None or predictions.empty:
+        return predictions
+
+    df = predictions.copy()
+
+    default_cols = {
+        "開盤主隊讓分": None,
+        "最新主隊讓分": None,
+        "主隊讓分變動": None,
+        "開盤大小分": None,
+        "最新大小分": None,
+        "大小分變動": None,
+        "盤口變動摘要": "盤口快照不足",
+    }
+
+    for col, value in default_cols.items():
+        if col not in df.columns:
+            df[col] = value
+
+    if not LINE_SNAPSHOT_CSV.exists():
+        return df
+
+    try:
+        snapshots = pd.read_csv(LINE_SNAPSHOT_CSV)
+    except Exception:
+        return df
+
+    if snapshots.empty or "game_id" not in snapshots.columns or "snapshot_time" not in snapshots.columns:
+        return df
+
+    snapshots = snapshots.copy()
+    snapshots["game_id"] = snapshots["game_id"].astype(str)
+    snapshots["snapshot_dt"] = pd.to_datetime(snapshots["snapshot_time"], errors="coerce")
+
+    snapshots["home_spread"] = pd.to_numeric(snapshots.get("home_spread"), errors="coerce")
+    snapshots["total"] = pd.to_numeric(snapshots.get("total"), errors="coerce")
+
+    movement_rows = []
+
+    for game_id, group in snapshots.groupby("game_id"):
+        group = group.sort_values("snapshot_dt").copy()
+
+        spread_group = group.dropna(subset=["home_spread"])
+        total_group = group.dropna(subset=["total"])
+
+        opening_spread = None
+        latest_spread = None
+        spread_move = None
+
+        if not spread_group.empty:
+            opening_spread = safe_float(spread_group.iloc[0].get("home_spread"), None)
+            latest_spread = safe_float(spread_group.iloc[-1].get("home_spread"), None)
+
+            if opening_spread is not None and latest_spread is not None:
+                spread_move = round(latest_spread - opening_spread, 2)
+
+        opening_total = None
+        latest_total = None
+        total_move = None
+
+        if not total_group.empty:
+            opening_total = safe_float(total_group.iloc[0].get("total"), None)
+            latest_total = safe_float(total_group.iloc[-1].get("total"), None)
+
+            if opening_total is not None and latest_total is not None:
+                total_move = round(latest_total - opening_total, 2)
+
+        summary_parts = []
+
+        if opening_spread is not None and latest_spread is not None:
+            summary_parts.append(
+                f"讓分 {opening_spread:+.1f} → {latest_spread:+.1f}（{spread_move:+.1f}）"
+            )
+
+        if opening_total is not None and latest_total is not None:
+            summary_parts.append(
+                f"大小 {opening_total:.1f} → {latest_total:.1f}（{total_move:+.1f}）"
+            )
+
+        summary = "｜".join(summary_parts) if summary_parts else "盤口快照不足"
+
+        movement_rows.append({
+            "game_id": str(game_id),
+            "開盤主隊讓分": opening_spread,
+            "最新主隊讓分": latest_spread,
+            "主隊讓分變動": spread_move,
+            "開盤大小分": opening_total,
+            "最新大小分": latest_total,
+            "大小分變動": total_move,
+            "盤口變動摘要": summary,
+        })
+
+    if not movement_rows:
+        return df
+
+    movement_df = pd.DataFrame(movement_rows)
+
+    df["game_id"] = df["game_id"].astype(str)
+
+    df = df.drop(
+        columns=[
+            "開盤主隊讓分", "最新主隊讓分", "主隊讓分變動",
+            "開盤大小分", "最新大小分", "大小分變動", "盤口變動摘要"
+        ],
+        errors="ignore"
+    )
+
+    df = df.merge(movement_df, on="game_id", how="left")
+
+    df["盤口變動摘要"] = df["盤口變動摘要"].fillna("盤口快照不足")
+
+    def spread_move_direction(row):
+        move = safe_float(row.get("主隊讓分變動"), None)
+
+        if move is None:
+            return "讓分盤口不足"
+
+        if abs(move) < 0.5:
+            return "讓分幾乎不動"
+
+        if move > 0:
+            return "盤口往主隊受讓方向移動"
+
+        return "盤口往主隊讓更多方向移動"
+
+    def total_move_direction(row):
+        move = safe_float(row.get("大小分變動"), None)
+
+        if move is None:
+            return "大小分盤口不足"
+
+        if abs(move) < 1.0:
+            return "大小分幾乎不動"
+
+        if move > 0:
+            return "市場往大分方向移動"
+
+        return "市場往小分方向移動"
+
+    df["讓分盤口方向"] = df.apply(spread_move_direction, axis=1)
+    df["大小分盤口方向"] = df.apply(total_move_direction, axis=1)
+
+    return df
+
 
 def predict_game(row):
+    away_team = row.get("客隊", "")
+    home_team = row.get("主隊", "")
+    away_abbr = row.get("客隊縮寫", "")
+    home_abbr = row.get("主隊縮寫", "")
 
-    # ===== 基本隊伍能力 =====
-    home_power = get_team_power(row.get("主隊縮寫"))
-    away_power = get_team_power(row.get("客隊縮寫"))
+    away_power = get_team_power(away_abbr)
+    home_power = get_team_power(home_abbr)
 
-    # ===== 近10場狀態 =====
-    recent_form = calc_recent_10_matchup_adjustment(
-        row.get("客隊"),
-        row.get("主隊"),
+    away_injury = get_combined_injury_adjustment(away_abbr)
+    home_injury = get_combined_injury_adjustment(home_abbr)
+
+    away_injury_adjust = safe_float(away_injury.get("adjust"), 0.0)
+    home_injury_adjust = safe_float(home_injury.get("adjust"), 0.0)
+    injury_edge = home_injury_adjust - away_injury_adjust
+
+    matchup = calc_recent_10_matchup_adjustment(
+        away_team,
+        home_team,
         TODAY_TW
     )
 
-    home_form = recent_form["home_form"]
-    away_form = recent_form["away_form"]
+    away_form = matchup.get("away_form", {})
+    home_form = matchup.get("home_form", {})
+    home_form_edge = safe_float(matchup.get("home_form_edge"), 0)
 
-    raw_home_form_edge = recent_form["home_form_edge"]
+    home_away_form = calc_home_away_form_edge(
+        home_team,
+        away_team,
+        TODAY_TW
+    )
+    home_away_edge = safe_float(home_away_form.get("home_edge"), 0)
 
-    # ===== 主場優勢 =====
     home_advantage = 2.0
 
-    # ===== 近況修正：不要吃滿，避免短期近況誤導 =====
-    form_edge = raw_home_form_edge * 0.45
-    form_edge = max(-3.0, min(3.0, form_edge))
+    line_move_adjust = 0.0
+    spread_move = safe_float(row.get("主隊讓分變動"), None)
 
-    # ===== 最終預測分差 =====
+    if spread_move is not None:
+        if spread_move <= -1.0:
+            line_move_adjust = 0.5
+        elif spread_move >= 1.0:
+            line_move_adjust = -0.5
+
     predicted_home_margin = (
-        (home_power - away_power)
+        home_power
+        - away_power
         + home_advantage
-        + form_edge
+        + home_form_edge * 0.45
+        + home_away_edge * 0.30
+        + injury_edge
+        + line_move_adjust
     )
 
-    # ===== 預測總分 =====
-    market_total = safe_float(row.get("total"), None)
+    predicted_home_margin = round(predicted_home_margin, 1)
 
-    if market_total is not None:
-        base_total = market_total
-    else:
-        base_total = 220
-
-    offense_adjust = (
-        (
-            home_form["avg_score"]
-            + away_form["avg_score"]
-        ) / 2
-    ) - 112
-
-    defense_adjust = (
-        (
-            home_form["avg_allowed"]
-            + away_form["avg_allowed"]
-        ) / 2
-    ) - 112
-
-    # 大小分修正也要保守，避免每場都看起來有明顯方向
-    total_adjust = (
-        offense_adjust * 0.35
-        - defense_adjust * 0.20
-    )
-
-    total_adjust = max(-5.0, min(5.0, total_adjust))
-
-    predicted_total = base_total + total_adjust
-
-    # ===== 盤口 =====
     home_spread = safe_float(row.get("home_spread"), None)
     total_line = safe_float(row.get("total"), None)
 
-    # =========================
-    # 讓分推薦
-    # =========================
-    if home_spread is None:
+    home_avg_score = safe_float(home_form.get("avg_score"), 0)
+    away_avg_score = safe_float(away_form.get("avg_score"), 0)
+    home_avg_allowed = safe_float(home_form.get("avg_allowed"), 0)
+    away_avg_allowed = safe_float(away_form.get("avg_allowed"), 0)
 
-        spread_pick = "無盤口"
-        spread_edge = 0
-        spread_reason = "目前沒有讓分盤。"
-
+    if home_avg_score > 0 and away_avg_score > 0:
+        offense_base = (home_avg_score + away_avg_score) / 2
     else:
+        offense_base = 112
 
-        home_cover_edge = predicted_home_margin + home_spread
-
-        if home_cover_edge > 0:
-
-            spread_pick = f"{row['主隊']} {home_spread:+.1f}"
-            spread_edge = abs(home_cover_edge)
-
-            spread_reason = (
-                f"預測主隊分差 {predicted_home_margin:.1f}。"
-                f"近況修正後優勢 {form_edge:+.1f}。"
-                f"主隊近10場：{home_form['summary']}。"
-            )
-
-        else:
-
-            away_spread = -home_spread
-
-            spread_pick = f"{row['客隊']} {away_spread:+.1f}"
-            spread_edge = abs(home_cover_edge)
-
-            spread_reason = (
-                f"預測主隊分差 {predicted_home_margin:.1f}。"
-                f"近況修正後優勢 {form_edge:+.1f}。"
-                f"客隊近10場：{away_form['summary']}。"
-            )
-
-    # =========================
-    # 大小分推薦
-    # =========================
-    if total_line is None:
-
-        total_pick = "無盤口"
-        total_edge = 0
-        total_reason = "目前沒有大小分盤。"
-
+    if home_avg_allowed > 0 and away_avg_allowed > 0:
+        defense_base = (home_avg_allowed + away_avg_allowed) / 2
     else:
+        defense_base = 112
 
-        diff = predicted_total - total_line
-
-        if diff >= 0:
-
-            total_pick = f"大分 {total_line:.1f}"
-            total_edge = abs(diff)
-
-            total_reason = (
-                f"預測總分 {predicted_total:.1f}。"
-                f"總分修正 {total_adjust:+.1f}。"
-                f"兩隊近10場進攻狀態偏高。"
-            )
-
-        else:
-
-            total_pick = f"小分 {total_line:.1f}"
-            total_edge = abs(diff)
-
-            total_reason = (
-                f"預測總分 {predicted_total:.1f}。"
-                f"總分修正 {total_adjust:+.1f}。"
-                f"兩隊近10場節奏與防守偏保守。"
-            )
-
-    # =========================
-    # 市場分析
-    # =========================
-    market_bias = market_bias_text(
-        home_spread,
-        total_line,
-        predicted_home_margin,
-        predicted_total
-    )
-
-    market_vs_prediction = market_vs_prediction_text(
-        home_spread,
-        spread_pick,
-        row.get("主隊"),
-        row.get("客隊"),
-        spread_edge
-    )
-
-    return pd.Series({
-        "預測主隊分差": round(predicted_home_margin, 1),
-        "預測總分": round(predicted_total, 1),
-
-        "主隊近10場": home_form["summary"],
-        "客隊近10場": away_form["summary"],
-
-        "主隊近況分數": round(home_form["form_score"], 2),
-        "客隊近況分數": round(away_form["form_score"], 2),
-
-        "讓分推薦": spread_pick,
-        "讓分優勢": round(spread_edge, 1),
-        "讓分理由": spread_reason,
-
-        "大小分推薦": total_pick,
-        "大小分優勢": round(total_edge, 1),
-        "大小分理由": total_reason,
-
-        "市場偏向": market_bias,
-        "市場與預測": market_vs_prediction,
-    })
-def market_vs_prediction_text(home_spread, spread_pick, home_team, away_team, spread_edge):
-    home_spread = safe_float(home_spread, None)
-    spread_edge = safe_float(spread_edge, 0)
-    spread_pick = str(spread_pick)
-
-    if home_spread is None:
-        return "盤口不足，暫不判斷市場方向。"
-
-    # ===== 判斷市場偏向 =====
-    if home_spread <= -7:
-        market_side = "主隊"
-        market_strength = "明顯"
-    elif home_spread <= -3:
-        market_side = "主隊"
-        market_strength = "小幅"
-    elif home_spread >= 7:
-        market_side = "客隊"
-        market_strength = "明顯"
-    elif home_spread >= 3:
-        market_side = "客隊"
-        market_strength = "小幅"
-    else:
-        return "市場方向接近五五波，暫不判斷順市場或反市場。"
-
-    # ===== 判斷預測推薦方向 =====
-    if str(home_team) in spread_pick:
-        prediction_side = "主隊"
-        prediction_text = str(home_team)
-    elif str(away_team) in spread_pick:
-        prediction_side = "客隊"
-        prediction_text = str(away_team)
-    else:
-        return "暫不判斷市場與預測方向。"
-
-    # ===== 反市場 / 順市場 =====
-    if market_side != prediction_side:
-        if spread_edge >= 6:
-            return f"🔥 強烈反市場：市場{market_strength}偏{market_side}，但預測支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
-        elif spread_edge >= 3:
-            return f"⚠️ 反市場：市場{market_strength}偏{market_side}，但預測支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
-        else:
-            return f"反市場但優勢不足：市場{market_strength}偏{market_side}，預測支持{prediction_text}，但差距只有 {spread_edge:.1f} 分。"
-
-    if spread_edge >= 6:
-        return f"✅ 順市場高信心：市場{market_strength}偏{market_side}，預測也支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
-    elif spread_edge >= 3:
-        return f"順市場可考慮：市場{market_strength}偏{market_side}，預測也支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
-    else:
-        return f"順市場但優勢普通：市場{market_strength}偏{market_side}，預測也支持{prediction_text}，優勢 {spread_edge:.1f} 分。"
-
-def market_bias_text(home_spread, total_line, predicted_home_margin, predicted_total):
-    home_spread = safe_float(home_spread, None)
-    total_line = safe_float(total_line, None)
-    predicted_home_margin = safe_float(predicted_home_margin, 0)
-    predicted_total = safe_float(predicted_total, 0)
-
-    parts = []
-
-    # ===== 讓分市場熱度 =====
-    if home_spread is None:
-        parts.append("讓分盤：盤口不足")
-    else:
-        if home_spread <= -7:
-            parts.append("讓分盤：市場明顯偏主隊")
-        elif home_spread <= -3:
-            parts.append("讓分盤：市場小幅偏主隊")
-        elif home_spread >= 7:
-            parts.append("讓分盤：市場明顯偏客隊")
-        elif home_spread >= 3:
-            parts.append("讓分盤：市場小幅偏客隊")
-        else:
-            parts.append("讓分盤：市場接近五五波")
-
-    # ===== 大小分市場熱度 =====
-    if total_line is None:
-        parts.append("大小分：盤口不足")
-    else:
-        if total_line >= 230:
-            parts.append("大小分：市場預期高比分")
-        elif total_line <= 215:
-            parts.append("大小分：市場預期低比分")
-        else:
-            parts.append("大小分：市場預期中等節奏")
-
-    # ===== 預測與市場差距 =====
-    if home_spread is not None:
-        home_cover_edge = predicted_home_margin + home_spread
-
-        if abs(home_cover_edge) >= 6:
-            parts.append(f"讓分差距：預測與盤口差距明顯（{abs(home_cover_edge):.1f} 分）")
-        elif abs(home_cover_edge) >= 3:
-            parts.append(f"讓分差距：預測與盤口有差距（{abs(home_cover_edge):.1f} 分）")
-        else:
-            parts.append("讓分差距：預測與盤口接近")
+    predicted_total = (
+        offense_base * 0.55
+        + defense_base * 0.45
+    ) * 2
 
     if total_line is not None:
-        total_edge = predicted_total - total_line
+        predicted_total = predicted_total * 0.55 + total_line * 0.45
 
-        if abs(total_edge) >= 8:
-            parts.append(f"大小分差距：預測與盤口差距明顯（{abs(total_edge):.1f} 分）")
-        elif abs(total_edge) >= 4:
-            parts.append(f"大小分差距：預測與盤口有差距（{abs(total_edge):.1f} 分）")
+    predicted_total = round(predicted_total, 1)
+
+    if home_spread is None:
+        spread_pick = "無盤口"
+        spread_edge = 0
+        spread_reason = "目前沒有讓分盤口，暫不推薦。"
+    else:
+        home_cover_edge = predicted_home_margin + home_spread
+        spread_edge = round(home_cover_edge, 1)
+
+        if home_cover_edge > 0:
+            spread_pick = f"{home_team} {home_spread:+.1f}"
+            spread_reason = (
+                f"預測主隊分差 {predicted_home_margin:+.1f}，"
+                f"盤口 {home_spread:+.1f}，主隊有 {abs(spread_edge):.1f} 分優勢。"
+            )
         else:
-            parts.append("大小分差距：預測與盤口接近")
+            away_spread = -home_spread
+            spread_pick = f"{away_team} {away_spread:+.1f}"
+            spread_reason = (
+                f"預測主隊分差 {predicted_home_margin:+.1f}，"
+                f"盤口 {home_spread:+.1f}，客隊有 {abs(spread_edge):.1f} 分優勢。"
+            )
 
-    return "；".join(parts) + "。"
+    if total_line is None:
+        total_pick = "無盤口"
+        total_edge = 0
+        total_reason = "目前沒有大小分盤口，暫不推薦。"
+    else:
+        total_edge_raw = predicted_total - total_line
+        total_edge = round(total_edge_raw, 1)
 
+        if total_edge_raw > 0:
+            total_pick = f"大分 {total_line:.1f}"
+            total_reason = (
+                f"預測總分 {predicted_total:.1f}，"
+                f"盤口 {total_line:.1f}，大分有 {abs(total_edge):.1f} 分優勢。"
+            )
+        else:
+            total_pick = f"小分 {total_line:.1f}"
+            total_reason = (
+                f"預測總分 {predicted_total:.1f}，"
+                f"盤口 {total_line:.1f}，小分有 {abs(total_edge):.1f} 分優勢。"
+            )
+
+    if abs(spread_edge) > abs(total_edge):
+        market_bias = "讓分優勢較明顯"
+    elif abs(total_edge) > abs(spread_edge):
+        market_bias = "大小分優勢較明顯"
+    else:
+        market_bias = "市場差異不明顯"
+
+    return pd.Series({
+        "客隊強度": away_power,
+        "主隊強度": home_power,
+        "主隊近10場": home_form.get("summary", ""),
+        "客隊近10場": away_form.get("summary", ""),
+        "主隊近10場場數": safe_int(home_form.get("games", 0), 0),
+        "客隊近10場場數": safe_int(away_form.get("games", 0), 0),
+        "主隊近況分數": round(safe_float(home_form.get("form_score"), 0), 2),
+        "客隊近況分數": round(safe_float(away_form.get("form_score"), 0), 2),
+        "主隊近況優勢": round(home_form_edge, 2),
+        "主客場近況優勢": round(home_away_edge, 2),
+        "客隊傷兵修正": away_injury_adjust,
+        "主隊傷兵修正": home_injury_adjust,
+        "傷兵影響": round(injury_edge, 2),
+        "盤口分差修正": round(line_move_adjust, 2),
+        "客隊傷兵備註": away_injury.get("note", ""),
+        "主隊傷兵備註": home_injury.get("note", ""),
+        "預測主隊分差": predicted_home_margin,
+        "預測總分": predicted_total,
+        "讓分推薦": spread_pick,
+        "讓分優勢": spread_edge,
+        "讓分理由": spread_reason,
+        "大小分推薦": total_pick,
+        "大小分優勢": total_edge,
+        "大小分理由": total_reason,
+        "市場偏向": market_bias,
+        "市場與預測": f"讓分優勢 {spread_edge:+.1f}｜大小分優勢 {total_edge:+.1f}",
+    })
 
 # =========================
 # 產生明日預測
@@ -1078,64 +1582,99 @@ def save_prediction_log(new_predictions):
 
     final_recs = build_final_recommendations(new_predictions)
 
-    if len(final_recs) == 0:
-        return
-
     keep_cols = [
         "game_id", "報告日期", "預測目標日期", "台灣開賽時間", "客隊", "主隊",
         "客隊縮寫", "主隊縮寫", "away_spread", "home_spread", "total",
         "預測主隊分差", "預測總分", "讓分推薦", "讓分優勢", "大小分推薦", "大小分優勢",
-        "市場偏向", "created_at",
+        "市場偏向",
+        "主客場近況優勢", "傷兵影響", "主隊傷兵修正", "客隊傷兵修正",
+        "主隊傷兵備註", "客隊傷兵備註",
+        "開盤主隊讓分", "最新主隊讓分", "主隊讓分變動", "讓分盤口方向",
+        "開盤大小分", "最新大小分", "大小分變動", "大小分盤口方向",
+        "盤口變動摘要",
+        "created_at",
+        "推薦等級", "推薦類型", "推薦內容", "信心分數", "預測優勢",
+        "盤口配合", "優勢絕對值", "優勢級距",
     ]
 
     rows = []
 
-    for item in final_recs:
-        game_text = str(item.get("比賽", ""))
+    if len(final_recs) == 0:
+        save_df = pd.DataFrame(columns=keep_cols)
+    else:
+        for item in final_recs:
+            if item.get("推薦等級") == "PASS":
+                base = new_predictions.iloc[0]
+            else:
+                game_text = str(item.get("比賽", ""))
 
-        mask = (
-            new_predictions["台灣開賽時間"].astype(str).eq(str(item.get("台灣開賽時間", "")))
-            & ((new_predictions["客隊"].astype(str) + " vs " + new_predictions["主隊"].astype(str)) == game_text)
-        )
+                mask = (
+                    new_predictions["台灣開賽時間"].astype(str).eq(str(item.get("台灣開賽時間", "")))
+                    & ((new_predictions["客隊"].astype(str) + " vs " + new_predictions["主隊"].astype(str)) == game_text)
+                )
 
-        if not mask.any():
-            continue
+                if not mask.any():
+                    continue
 
-        base = new_predictions.loc[mask].iloc[0]
+                base = new_predictions.loc[mask].iloc[0]
 
-        row = {}
+            row = {}
 
-        for col in keep_cols:
-            if col in new_predictions.columns:
+            for col in keep_cols:
                 row[col] = base.get(col, "")
 
-        row["推薦等級"] = item.get("推薦等級", "")
-        row["推薦類型"] = item.get("類型", "")
-        row["推薦內容"] = item.get("推薦", "")
-        row["信心分數"] = item.get("信心分數", "")
-        row["預測優勢"] = item.get("預測優勢", "")
+            row["推薦等級"] = item.get("推薦等級", "")
+            row["推薦類型"] = item.get("類型", "")
+            row["推薦內容"] = item.get("推薦", "")
+            row["信心分數"] = item.get("信心分數", "")
+            row["預測優勢"] = item.get("預測優勢", "")
+            row["盤口配合"] = item.get("盤口配合", "盤口資料不足")
 
-        rows.append(row)
+            edge_value = abs(safe_float(item.get("預測優勢", 0), 0))
+            row["優勢絕對值"] = edge_value
 
-    save_df = pd.DataFrame(rows)
+            if edge_value >= 6.0:
+                row["優勢級距"] = ">=6.0"
+            elif edge_value >= 5.0:
+                row["優勢級距"] = ">=5.0"
+            elif edge_value >= 4.0:
+                row["優勢級距"] = ">=4.0"
+            elif edge_value >= 2.5:
+                row["優勢級距"] = ">=2.5"
+            else:
+                row["優勢級距"] = "<2.5"
+
+            rows.append(row)
+
+        save_df = pd.DataFrame(rows)
 
     old = load_prediction_log()
 
     if not old.empty:
-        if "報告日期" in old.columns and "預測目標日期" in old.columns:
-            old = old[
-                ~(
-                    old["報告日期"].astype(str).eq(str(TODAY_TW))
-                    & old["預測目標日期"].astype(str).eq(str(TOMORROW_TW))
-                )
-            ].copy()
+        for col in keep_cols:
+            if col not in old.columns:
+                old[col] = ""
+
+        old = old[
+            ~(
+                old["報告日期"].astype(str).eq(str(TODAY_TW))
+                & old["預測目標日期"].astype(str).eq(str(TOMORROW_TW))
+            )
+        ].copy()
 
         combined = pd.concat([old, save_df], ignore_index=True)
     else:
         combined = save_df
 
+    for col in keep_cols:
+        if col not in combined.columns:
+            combined[col] = ""
+
+    combined = combined[keep_cols]
+
     combined.to_csv(PREDICTION_LOG_CSV, index=False, encoding="utf-8-sig")
-    
+
+
 def verify_yesterday_predictions():
     log = load_prediction_log()
     if log.empty:
@@ -1162,6 +1701,9 @@ def verify_yesterday_predictions():
 
     verify_rows = []
     for _, row in merged.iterrows():
+        if str(row.get("推薦等級", "")) == "PASS" or str(row.get("推薦類型", "")) == "觀望":
+            continue
+
         rec_level = normalize_rec_level(row.get("推薦等級", ""))
         rec_type = str(row.get("推薦類型", ""))
         rec_pick = str(row.get("推薦內容", ""))
@@ -1236,17 +1778,13 @@ def verify_yesterday_predictions():
     return verify_df
 
 # =========================
-# 7天 / 30天勝率
+# 近 7 筆 / 近 30 筆勝率
 # =========================
 
 def calculate_win_rates():
     log = load_prediction_log()
 
     output = {
-        "spread_7": "無資料",
-        "spread_30": "無資料",
-        "total_7": "無資料",
-        "total_30": "無資料",
         "main_7": "0/0（0.0%）",
         "main_30": "0/0（0.0%）",
         "top3_7": "0/0（0.0%）",
@@ -1299,6 +1837,14 @@ def calculate_win_rates():
             .str.contains("過|沒過", na=False)
         ].copy()
 
+    if "推薦等級" in all_df.columns:
+        all_df = all_df[
+            ~all_df["推薦等級"]
+            .fillna("")
+            .astype(str)
+            .str.contains("PASS|觀望", na=False)
+        ].copy()
+
     if all_df.empty:
         return output
 
@@ -1332,84 +1878,249 @@ def calculate_win_rates():
 
     return output
 
+def calculate_edge_bucket_rates():
+    """V4-13：回測不同預測優勢級距的勝率。
+
+    目的：
+    - 不靠感覺調整門檻。
+    - 用歷史紀錄觀察：優勢越大，勝率是否真的越高。
+    - 先只印在終端機，不影響推薦邏輯。
+    """
+    log = load_prediction_log()
+
+    if log.empty or "預測優勢" not in log.columns:
+        return pd.DataFrame()
+
     today = TODAY_TW
-    windows = {"7": 7, "30": 30}
-
-    for label, days in windows.items():
-        start_date = today - timedelta(days=days)
-        all_verified = []
-
-        for i in range(days + 1):
-            d = start_date + timedelta(days=i)
-
-            if d > today:
-                continue
-
-            verified = verify_predictions_for_date(d)
-
-            if not verified.empty:
-                all_verified.append(verified)
-
-        vdf = pd.concat(all_verified, ignore_index=True) if all_verified else pd.DataFrame()
-
-        if not vdf.empty and "推薦等級" in vdf.columns:
-            vdf = vdf[
-                vdf["推薦等級"]
-                .fillna("")
-                .astype(str)
-                .str.contains("主推|副推", na=False)
-            ].copy()
-
-        if not vdf.empty and "結果" in vdf.columns:
-            vdf = vdf[
-                vdf["結果"]
-                .fillna("")
-                .astype(str)
-                .str.contains("過|沒過", na=False)
-            ].copy()
-
-        output[f"main_{label}"] = format_final_pick_rate(vdf, only_main=True)
-        output[f"top3_{label}"] = format_final_pick_rate(vdf, only_main=False)
-        output[f"overall_{label}"] = format_final_pick_rate(vdf, only_main=False)
-
-    all_verified = []
+    verified_list = []
 
     for d in log["預測目標日期"].dropna().unique():
         try:
-            d = pd.to_datetime(d).date()
+            check_date = pd.to_datetime(d).date()
 
-            if d > today:
+            if check_date > today:
                 continue
 
-            verified = verify_predictions_for_date(d)
+            verified = verify_predictions_for_date(check_date)
 
             if not verified.empty:
-                all_verified.append(verified)
+                verified["預測目標日期"] = str(check_date)
+                verified_list.append(verified)
+
         except Exception:
             continue
 
-    if all_verified:
-        all_df = pd.concat(all_verified, ignore_index=True)
+    if not verified_list:
+        return pd.DataFrame()
 
-        if "推薦等級" in all_df.columns:
-            all_df = all_df[
-                all_df["推薦等級"]
-                .fillna("")
-                .astype(str)
-                .str.contains("主推|副推", na=False)
-            ].copy()
+    verified_df = pd.concat(verified_list, ignore_index=True)
 
-        if "結果" in all_df.columns:
-            all_df = all_df[
-                all_df["結果"]
-                .fillna("")
-                .astype(str)
-                .str.contains("過|沒過", na=False)
-            ].copy()
+    base = log.copy()
+    base["預測目標日期"] = base["預測目標日期"].astype(str)
 
-        output["overall_all"] = format_final_pick_rate(all_df, only_main=False)
+    merged = base.merge(
+        verified_df[["預測目標日期", "推薦等級", "推薦類型", "推薦內容", "推薦結果"]],
+        on=["預測目標日期", "推薦等級", "推薦類型", "推薦內容"],
+        how="left"
+    )
 
-    return output
+    merged["預測優勢數值"] = pd.to_numeric(merged["預測優勢"], errors="coerce").abs()
+
+    merged = merged[
+        merged["推薦結果"].astype(str).isin(["過", "沒過"])
+    ].copy()
+
+    if merged.empty:
+        return pd.DataFrame()
+
+    buckets = [
+        ("優勢 >= 2.5", 2.5),
+        ("優勢 >= 4.0", 4.0),
+        ("優勢 >= 5.0", 5.0),
+        ("優勢 >= 6.0", 6.0),
+    ]
+
+    rows = []
+
+    for label, threshold in buckets:
+        temp = merged[merged["預測優勢數值"] >= threshold].copy()
+
+        total = len(temp)
+        win = temp["推薦結果"].astype(str).eq("過").sum()
+        lose = temp["推薦結果"].astype(str).eq("沒過").sum()
+
+        if total == 0:
+            rate_text = "無資料"
+        else:
+            rate_text = f"{win}/{total}（{win / total * 100:.1f}%）"
+
+        rows.append({
+            "優勢門檻": label,
+            "過": win,
+            "沒過": lose,
+            "總數": total,
+            "勝率": rate_text,
+        })
+
+    return pd.DataFrame(rows)
+
+
+
+def calculate_confidence_threshold_rates():
+    """回測不同信心分數門檻的勝率。
+
+    目的：
+    - 找出主推門檻 72% 是否合理。
+    - 不先改推薦邏輯，只先印出統計結果。
+    """
+    log = load_prediction_log()
+
+    if log.empty or "信心分數" not in log.columns:
+        return pd.DataFrame()
+
+    today = TODAY_TW
+    verified_list = []
+
+    for d in log["預測目標日期"].dropna().unique():
+        try:
+            check_date = pd.to_datetime(d).date()
+
+            if check_date > today:
+                continue
+
+            verified = verify_predictions_for_date(check_date)
+
+            if not verified.empty:
+                verified["預測目標日期"] = str(check_date)
+                verified_list.append(verified)
+
+        except Exception:
+            continue
+
+    if not verified_list:
+        return pd.DataFrame()
+
+    verified_df = pd.concat(verified_list, ignore_index=True)
+
+    base = log.copy()
+    base["預測目標日期"] = base["預測目標日期"].astype(str)
+
+    merged = base.merge(
+        verified_df[["預測目標日期", "推薦等級", "推薦類型", "推薦內容", "推薦結果"]],
+        on=["預測目標日期", "推薦等級", "推薦類型", "推薦內容"],
+        how="left"
+    )
+
+    merged["信心分數數值"] = merged["信心分數"].apply(confidence_to_percent)
+
+    merged = merged[
+        merged["推薦結果"].astype(str).isin(["過", "沒過"])
+    ].copy()
+
+    if merged.empty:
+        return pd.DataFrame()
+
+    thresholds = [58, 61, 64, 68, 70, 72, 73, 75]
+
+    rows = []
+
+    for threshold in thresholds:
+        temp = merged[merged["信心分數數值"] >= threshold].copy()
+
+        total = len(temp)
+        win = temp["推薦結果"].astype(str).eq("過").sum()
+        lose = temp["推薦結果"].astype(str).eq("沒過").sum()
+
+        if total == 0:
+            rate_text = "無資料"
+        else:
+            rate_text = f"{win}/{total}（{win / total * 100:.1f}%）"
+
+        rows.append({
+            "信心門檻": f">= {threshold}%",
+            "過": win,
+            "沒過": lose,
+            "總數": total,
+            "勝率": rate_text,
+        })
+
+    return pd.DataFrame(rows)
+
+
+def calculate_line_alignment_rates():
+    """V5-6：回測順盤 / 逆盤 / 中性推薦勝率。
+
+    只印在終端機，不改推薦分數。
+    """
+    log = load_prediction_log()
+
+    if log.empty or "盤口配合" not in log.columns:
+        return pd.DataFrame()
+
+    today = TODAY_TW
+    verified_list = []
+
+    for d in log["預測目標日期"].dropna().unique():
+        try:
+            check_date = pd.to_datetime(d).date()
+
+            if check_date > today:
+                continue
+
+            verified = verify_predictions_for_date(check_date)
+
+            if not verified.empty:
+                verified["預測目標日期"] = str(check_date)
+                verified_list.append(verified)
+
+        except Exception:
+            continue
+
+    if not verified_list:
+        return pd.DataFrame()
+
+    verified_df = pd.concat(verified_list, ignore_index=True)
+
+    base = log.copy()
+    base["預測目標日期"] = base["預測目標日期"].astype(str)
+
+    merged = base.merge(
+        verified_df[["預測目標日期", "推薦等級", "推薦類型", "推薦內容", "推薦結果"]],
+        on=["預測目標日期", "推薦等級", "推薦類型", "推薦內容"],
+        how="left"
+    )
+
+    merged = merged[
+        merged["推薦結果"].astype(str).isin(["過", "沒過"])
+    ].copy()
+
+    if merged.empty:
+        return pd.DataFrame()
+
+    rows = []
+
+    for status in ["順盤", "逆盤", "盤口中性", "盤口資料不足"]:
+        temp = merged[merged["盤口配合"].astype(str).eq(status)].copy()
+
+        total = len(temp)
+        win = temp["推薦結果"].astype(str).eq("過").sum()
+        lose = temp["推薦結果"].astype(str).eq("沒過").sum()
+
+        if total == 0:
+            rate_text = "無資料"
+        else:
+            rate_text = f"{win}/{total}（{win / total * 100:.1f}%）"
+
+        rows.append({
+            "盤口配合": status,
+            "過": win,
+            "沒過": lose,
+            "總數": total,
+            "勝率": rate_text,
+        })
+
+    return pd.DataFrame(rows)
+
 def build_summary_text(win_rates):
     try:
         main = win_rates.get("main_7", "0/0（0.0%）")
@@ -1583,38 +2294,33 @@ def df_to_html_table(df, columns=None):
 
 
 def confidence_score(edge):
+    """V4-8：更保守的信心分數。
+
+    核心原則：
+    - 小優勢不要假裝很有把握。
+    - 只有明顯優勢才給到 64% 以上。
+    - 70% 以上保留給非常強的選項。
     """
-    把優勢分數轉成 0～100% 的信心分數
+    edge = abs(safe_float(edge, 0))
 
-    重點：
-    - 不再用 /50
-    - 分數不要太容易灌高
-    - 小優勢只給普通信心
-    - 明顯優勢才會超過 65%
-    """
-    if edge is None:
-        return 50
+    if edge < 1.0:
+        return 52
+    if edge < 1.8:
+        return 55
+    if edge < 2.5:
+        return 58
+    if edge < 3.5:
+        return 61
+    if edge < 4.5:
+        return 64
+    if edge < 6.0:
+        return 68
+    if edge < 7.5:
+        return 70
+    if edge < 9.0:
+        return 73
 
-    edge = abs(float(edge))
-
-    if edge < 1:
-        score = 52
-    elif edge < 2:
-        score = 55
-    elif edge < 3:
-        score = 58
-    elif edge < 4:
-        score = 61
-    elif edge < 5:
-        score = 64
-    elif edge < 6:
-        score = 67
-    elif edge < 7:
-        score = 70
-    else:
-        score = 73
-
-    return score
+    return 75
 
 
 def confidence_label(score):
@@ -1766,41 +2472,102 @@ def yesterday_top3_summary_html(yesterday_verify):
 
     return f"<div class='verify-summary'>昨日 Top3：{win_count} 過 {lose_count} 沒過（{top3_rate:.1f}%）｜{main_text}</div>"
 
-    top3_rate = win_count / valid_total * 100
 
-    main_df = df[df["推薦等級"].astype(str) == "🔥 主推"]
-    main_result = main_df["結果"].astype(str) if not main_df.empty else pd.Series(dtype=str)
 
-    main_win = main_result.str.contains("✅ 過").sum()
-    main_lose = main_result.str.contains("❌ 沒過").sum()
-    main_total = main_win + main_lose
+def line_alignment_status(row, rec_type, pick):
+    """V5-5：判斷推薦是否順著盤口變動。
 
-    if main_total == 0:
-        main_text = "主推：尚無結果"
-    else:
-        main_rate = main_win / main_total * 100
-        main_text = f"主推：{main_win} 過 {main_lose} 沒過（{main_rate:.1f}%）"
+    只做標記，不加減分。
+    """
+    rec_type = str(rec_type)
+    pick = str(pick)
 
-    return f"<div class='verify-summary'>昨日 Top3：{win_count} 過 {lose_count} 沒過（{top3_rate:.1f}%）｜{main_text}</div>"
+    if rec_type == "讓分":
+        move = safe_float(row.get("主隊讓分變動"), None)
 
-    results = yesterday_verify["結果"].astype(str)
+        if move is None:
+            return "盤口資料不足"
 
-    win_count = results.str.contains("過").sum()
-    lose_count = results.str.contains("沒過").sum()
-    valid_total = win_count + lose_count
+        if abs(move) < 0.5:
+            return "盤口中性"
 
-    if valid_total == 0:
-        return "<div class='verify-summary'>昨日 Top3：目前尚無已完賽結果</div>"
+        home_team = str(row.get("主隊", ""))
+        away_team = str(row.get("客隊", ""))
 
-    rate = win_count / valid_total * 100
+        # home_spread 變小，例如 -3 → -5，代表市場往主隊方向
+        if move < 0:
+            if home_team in pick:
+                return "順盤"
+            if away_team in pick:
+                return "逆盤"
 
-    return f"<div class='verify-summary'>昨日 Top3：{win_count} 過 {lose_count} 沒過（{rate:.1f}%）</div>"
+        # home_spread 變大，例如 -5 → -3 或 +2 → +4，代表市場往客隊方向
+        if move > 0:
+            if away_team in pick:
+                return "順盤"
+            if home_team in pick:
+                return "逆盤"
+
+        return "盤口中性"
+
+    if rec_type == "大小分":
+        move = safe_float(row.get("大小分變動"), None)
+
+        if move is None:
+            return "盤口資料不足"
+
+        if abs(move) < 1.0:
+            return "盤口中性"
+
+        if move > 0 and "大分" in pick:
+            return "順盤"
+
+        if move < 0 and "小分" in pick:
+            return "順盤"
+
+        if move > 0 and "小分" in pick:
+            return "逆盤"
+
+        if move < 0 and "大分" in pick:
+            return "逆盤"
+
+        return "盤口中性"
+
+    return "盤口資料不足"
+
+
+def adjust_confidence_by_line(score, alignment_status):
+    """
+    V4-4：盤口變動納入信心分數。
+    順盤：小幅加分
+    逆盤：扣分
+    中性 / 資料不足：不動
+    """
+    score = safe_float(score, 0)
+    alignment_status = str(alignment_status)
+
+    if alignment_status == "順盤":
+        score += 2
+    elif alignment_status == "逆盤":
+        score -= 3
+
+    return int(max(0, min(100, score)))
 
 def build_final_recommendations(predictions):
-    """建立最終推薦：主推、副推 1、副推 2。"""
+    """建立最終推薦。
+
+    V4-11：
+    - 信心分數仍然由 confidence_score(edge) 決定。
+    - 不重做前面分數邏輯。
+    - 排序時先看信心分數，再看實際預測優勢大小。
+    - 避免同一個信心區間內，較小優勢的場次排在較大優勢前面。
+    """
 
     if predictions is None or predictions.empty:
         return []
+
+    MAIN_MIN_SCORE = MAIN_PICK_MIN_CONFIDENCE
+    SECONDARY_MIN_SCORE = 64
 
     items = []
 
@@ -1812,17 +2579,39 @@ def build_final_recommendations(predictions):
             if pd.isna(edge):
                 edge = 0
 
+            edge_value = abs(safe_float(edge, 0))
+
+            if edge_value < 2.5:
+                continue
+
             score = confidence_score(edge)
+            alignment = line_alignment_status(row, "大小分", row.get("大小分推薦", ""))
+            score = adjust_confidence_by_line(score, alignment)
+
+            sample_games = min(
+                safe_int(row.get("主隊近10場場數", 0), 0),
+                safe_int(row.get("客隊近10場場數", 0), 0)
+            )
+
+            if sample_games < 5:
+                score -= 8
+            elif sample_games < 8:
+                score -= 4
+
+            score = int(max(0, min(100, score)))
 
             items.append({
                 "推薦等級": "",
                 "類型": "大小分",
+                "game_id": row.get("game_id", ""),
                 "台灣開賽時間": row.get("台灣開賽時間", ""),
                 "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
                 "推薦": row.get("大小分推薦", ""),
                 "信心分數": f"{score}%",
                 "信心分數數值": score,
                 "預測優勢": edge,
+                "排序優勢": edge_value,
+                "盤口配合": alignment,
                 "理由": row.get("大小分理由", ""),
             })
 
@@ -1832,51 +2621,126 @@ def build_final_recommendations(predictions):
             if pd.isna(edge):
                 edge = 0
 
+            edge_value = abs(safe_float(edge, 0))
+
+            if edge_value < 2.5:
+                continue
+
             score = confidence_score(edge)
+            alignment = line_alignment_status(row, "讓分", row.get("讓分推薦", ""))
+            score = adjust_confidence_by_line(score, alignment)
+
+            sample_games = min(
+                safe_int(row.get("主隊近10場場數", 0), 0),
+                safe_int(row.get("客隊近10場場數", 0), 0)
+            )
+
+            if sample_games < 5:
+                score -= 8
+            elif sample_games < 8:
+                score -= 4
+
+            score = int(max(0, min(100, score)))
 
             items.append({
                 "推薦等級": "",
                 "類型": "讓分",
+                "game_id": row.get("game_id", ""),
                 "台灣開賽時間": row.get("台灣開賽時間", ""),
                 "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
                 "推薦": row.get("讓分推薦", ""),
                 "信心分數": f"{score}%",
                 "信心分數數值": score,
                 "預測優勢": edge,
+                "排序優勢": edge_value,
+                "盤口配合": alignment,
                 "理由": row.get("讓分理由", ""),
             })
 
     if len(items) == 0:
         return []
 
-    items = sorted(items, key=lambda x: x.get("信心分數數值", 0), reverse=True)
-    items = items[:3]
+    items = sorted(
+        items,
+        key=lambda x: (
+            x.get("信心分數數值", 0),
+            x.get("排序優勢", 0)
+        ),
+        reverse=True
+    )
 
-    for i, item in enumerate(items):
-        if i == 0:
-            item["推薦等級"] = "主推"
-        else:
-            item["推薦等級"] = f"副推 {i}"
+    if items[0].get("信心分數數值", 0) < MAIN_MIN_SCORE:
+        return [{
+            "推薦等級": "PASS",
+            "類型": "觀望",
+            "台灣開賽時間": "",
+            "比賽": "今日全部場次",
+            "推薦": "今日沒有達到主推門檻的選項",
+            "信心分數": f"{items[0].get('信心分數數值', 0)}%",
+            "信心分數數值": items[0].get("信心分數數值", 0),
+            "預測優勢": items[0].get("預測優勢", 0),
+            "理由": "最高分仍低於主推門檻，依照 V4 規則選擇不硬推，避免為了湊推薦而降低勝率。",
+        }]
 
-    return items
+    final_items = []
+
+    main_item = items[0]
+    main_item["推薦等級"] = "主推"
+    final_items.append(main_item)
+
+    secondary_items = [
+        item for item in items[1:]
+        if item.get("信心分數數值", 0) >= SECONDARY_MIN_SCORE
+    ]
+
+    for i, item in enumerate(secondary_items[:2], start=1):
+        item["推薦等級"] = f"副推 {i}"
+        final_items.append(item)
+
+    return final_items
 
 def final_recommendations_html(predictions):
     recs = build_final_recommendations(predictions)
+
     if not recs:
         return "<p class='empty'>目前沒有足夠盤口產生最終推薦。</p>"
 
     html_parts = []
+
     for item in recs:
+        if item.get("推薦等級") == "PASS":
+            html_parts.append(f"""
+            <div class="final-card">
+                <div class="final-level">今日觀望｜不硬推</div>
+                <div class="final-game">{item['比賽']}</div>
+                <div class="final-pick">{item['推薦']}</div>
+                <div class="final-score">
+                    最高信心：{item['信心分數']}｜
+                    優勢：{item['預測優勢']} 分｜
+                    {confidence_label(item.get('信心分數數值', 0))}
+                </div>
+                <div class="final-reason">
+                    {item['理由']}
+                </div>
+            </div>
+            """)
+            continue
+
         main_class = " final-main" if item["推薦等級"] == "主推" else ""
+
+        away_name = item["比賽"].split(" vs ")[0]
+        home_name = item["比賽"].split(" vs ")[1]
+
         html_parts.append(f"""
         <div class="final-card{main_class}">
             <div class="final-level">{final_level_display(item['推薦等級'])}｜{item['類型']}</div>
-            <div class="final-game">{short_name(item['比賽'].split(' vs ')[0])} vs {short_name(item['比賽'].split(' vs ')[1])}</div>
+            <div class="final-game">{short_name(away_name)} vs {short_name(home_name)}</div>
             <div class="final-pick">{pick_short_name(item['推薦'])}</div>
             <div class="final-score">
                 信心：{item['信心分數']}｜
                 優勢：{item['預測優勢']} 分｜
-                {edge_level(item['預測優勢'])}
+                盤口：{item.get('盤口配合', '盤口資料不足')}｜
+                {confidence_label(item.get('信心分數數值', 0))}
             </div>
 
             <div class="final-reason">
@@ -1884,6 +2748,7 @@ def final_recommendations_html(predictions):
             </div>
         </div>
         """)
+
     return "\n".join(html_parts)
 
 
@@ -1899,7 +2764,7 @@ def pick_badge_text(row, pick_type):
         return "暫不推薦"
 
     score = confidence_score(edge)
-    return f"{score}/50（{confidence_label(score)}）"
+    return f"{score}%（{confidence_label(score)}）"
 
 
 def simple_game_cards(predictions):
@@ -1958,6 +2823,24 @@ def simple_game_cards(predictions):
             </div>
 
             <div class="market-line">
+                主客場近況優勢：
+                {row.get('主客場近況優勢', 0)}
+            </div>
+
+            <div class="market-line">
+                傷兵修正：
+                主隊 {row.get('主隊傷兵修正', 0)}｜
+                客隊 {row.get('客隊傷兵修正', 0)}｜
+                影響 {row.get('傷兵影響', 0)}
+            </div>
+
+            <div class="market-line">
+                傷兵備註：
+                主隊 {row.get('主隊傷兵備註', '')}｜
+                客隊 {row.get('客隊傷兵備註', '')}
+            </div>
+
+            <div class="market-line">
                 市場判斷：
                 {row.get('市場偏向', '')}
             </div>
@@ -1993,7 +2876,7 @@ def build_top3_cards(df, type_name):
             <div class="top3-pick">{pick_short_name(pick)}</div>
 
             <div class="top3-info">
-                信心分數 {score}/50｜
+                信心分數 {score}%｜
                 優勢 {edge} 分｜
                 {edge_level(edge)}
             </div>
@@ -2194,6 +3077,46 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
             history_html = "<p class='empty'>目前沒有歷史紀錄。</p>"
     else:
         history_html = "<p class='empty'>找不到 prediction_log_v3.csv。</p>"
+
+    # ===== PASS 歷史紀錄 =====
+    pass_history_html = "<p class='empty'>目前沒有 PASS 紀錄。</p>"
+
+    if PREDICTION_LOG_CSV.exists():
+        pass_df = load_prediction_log()
+
+        if not pass_df.empty and "推薦等級" in pass_df.columns:
+            pass_df = pass_df[
+                pass_df["推薦等級"].fillna("").astype(str).eq("PASS")
+            ].copy()
+
+            if not pass_df.empty:
+                if "預測目標日期" in pass_df.columns:
+                    pass_df["排序日期"] = pd.to_datetime(pass_df["預測目標日期"], errors="coerce")
+                    pass_df = pass_df.sort_values("排序日期", ascending=False).drop(columns=["排序日期"])
+
+                for col in ["預測目標日期", "推薦內容", "信心分數", "預測優勢", "盤口配合", "優勢級距"]:
+                    if col not in pass_df.columns:
+                        pass_df[col] = "—"
+
+                pass_df = pass_df[[
+                    "預測目標日期",
+                    "推薦內容",
+                    "信心分數",
+                    "預測優勢",
+                    "盤口配合",
+                    "優勢級距",
+                ]].head(30)
+
+                pass_df = pass_df.rename(columns={
+                    "預測目標日期": "日期",
+                    "推薦內容": "內容",
+                })
+
+                pass_history_html = pass_df.to_html(
+                    index=False,
+                    escape=False,
+                    classes="data-table"
+                )
 
     # ===== 明日預測 =====
     if predictions.empty:
@@ -2557,7 +3480,6 @@ h2 {{
     <div class="subtitle">產生時間：{tw_now_text()}｜預測日期：{TOMORROW_TW}</div>
 
     <h2>明日推薦</h2>
-    </div>
 
     <div class="final-wrap">
         {final_recommendations_html(predictions)}
@@ -2604,6 +3526,13 @@ h2 {{
         </div>
     </details>
 
+    <details class="history-box">
+        <summary>🟡 查看 PASS 觀望紀錄（最近 30 筆）</summary>
+        <div class="section" style="margin-top:14px;">
+            {pass_history_html}
+        </div>
+    </details>
+
     <h2>大小分 Top 3</h2>
     <div class="section">
         {top_total_html}
@@ -2634,6 +3563,10 @@ def main():
     print("預測明天：", TOMORROW_TW)
     print("驗證昨天：", YESTERDAY_TW)
 
+    # ===== 自動傷兵 =====
+    print("\n正在抓取自動傷兵資料...")
+    save_auto_injury_adjustments(TOMORROW_TW)
+
     # ===== 明日預測 =====
     t1 = time.time()
 
@@ -2641,6 +3574,11 @@ def main():
     predictions = build_tomorrow_predictions()
 
     print("明日比賽場次：", len(predictions))
+
+    save_line_snapshots(predictions)
+    predictions = add_line_movement_columns(predictions)
+    print("盤口快照已更新，盤口變動已計算")
+
     print("明日預測耗時：", round(time.time() - t1, 2), "秒")
 
     if not predictions.empty:
@@ -2649,6 +3587,7 @@ def main():
             "away_spread", "home_spread", "total",
             "預測總分", "大小分推薦", "大小分優勢",
             "讓分推薦", "讓分優勢",
+            "盤口變動摘要", "讓分盤口方向", "大小分盤口方向",
         ]
 
         print("\n======== 明日預測 ========")
@@ -2680,10 +3619,32 @@ def main():
     # ===== 勝率 =====
     t4 = time.time()
 
-    print("\n正在計算 7天 / 30天勝率...")
+    print("\n正在計算近 7 筆 / 近 30 筆勝率...")
     win_rates = calculate_win_rates()
 
     print("勝率統計：", win_rates)
+
+    edge_bucket_rates = calculate_edge_bucket_rates()
+    if edge_bucket_rates.empty:
+        print("優勢級距勝率：目前無足夠資料")
+    else:
+        print("\n======== 優勢級距勝率回測 ========")
+        print(edge_bucket_rates.to_string(index=False))
+
+    confidence_threshold_rates = calculate_confidence_threshold_rates()
+    if confidence_threshold_rates.empty:
+        print("信心分數門檻勝率：目前無足夠資料")
+    else:
+        print("\n======== 信心分數門檻勝率回測 ========")
+        print(confidence_threshold_rates.to_string(index=False))
+
+    line_alignment_rates = calculate_line_alignment_rates()
+    if line_alignment_rates.empty:
+        print("順盤 / 逆盤勝率：目前無足夠資料")
+    else:
+        print("\n======== 順盤 / 逆盤勝率回測 ========")
+        print(line_alignment_rates.to_string(index=False))
+
     print("勝率計算耗時：", round(time.time() - t4, 2), "秒")
 
     # ===== HTML =====
