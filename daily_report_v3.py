@@ -3776,7 +3776,6 @@ def build_top3_cards(df, type_name):
 def generate_html_report(predictions, yesterday_verify, win_rates):
     summary_text = build_summary_text(win_rates)
     season_dashboard_html = build_season_dashboard_html(win_rates)
-    season_archive_html = build_season_archive_html()
     health_html = build_data_health_html()
     finals_html = build_finals_report_html()
 
@@ -4307,12 +4306,6 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
             <div class="section">
                 {finals_html}
             </div>
-
-            <h2>歷年摘要</h2>
-            <div class="section">
-                {season_archive_html}
-            </div>
-
             <details class="history-box">
                 <summary>📂 查看歷史推薦紀錄（最近 30 筆）</summary>
                 <div class="section" style="margin-top:14px;">
