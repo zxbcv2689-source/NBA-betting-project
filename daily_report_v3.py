@@ -4256,12 +4256,42 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
     else:
         yesterday_table = "<p class='empty'>昨日沒有資料</p>"
 
+    has_tomorrow_games = predictions is not None and not predictions.empty
+    has_yesterday_verify = yesterday_verify is not None and not yesterday_verify.empty
+
+    if has_tomorrow_games:
+        report_title = "NBA 明日預測報告"
+        report_subtitle = f"產生時間：{tw_now_text()}｜預測日期：{TOMORROW_TW}"
+        tomorrow_section_html = f"""
+    <h2>明日推薦</h2>
+
+    <div class="final-wrap">
+        {final_recommendations_html(predictions)}
+    </div>
+"""
+    else:
+        report_title = f"NBA {stable_season_label(TODAY_TW)} 結算報告"
+        report_subtitle = f"產生時間：{tw_now_text()}｜賽季結算 / 休賽期封存"
+        tomorrow_section_html = ""
+
+    if has_yesterday_verify:
+        yesterday_section_html = f"""
+    <h2>昨日驗證</h2>
+    {yesterday_top3_summary_html(yesterday_verify)}
+
+    <div class="section">
+        {yesterday_table}
+    </div>
+"""
+    else:
+        yesterday_section_html = ""
+
     html = f"""
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>NBA 預測分析報告 v3</title>
+<title>{report_title}</title>
 <style>
 body {{
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif;
@@ -4567,26 +4597,17 @@ h2 {{
 
 <body>
 <div class="container">
-    <h1>NBA 明日預測報告</h1>
-    <div class="subtitle">產生時間：{tw_now_text()}｜預測日期：{TOMORROW_TW}</div>
+    <h1>{report_title}</h1>
+    <div class="subtitle">{report_subtitle}</div>
 
     <h2>{stable_season_label(TODAY_TW)} 總覽</h2>
     <div class="section">
         {season_dashboard_html}
     </div>
 
-    <h2>明日推薦</h2>
+    {tomorrow_section_html}
 
-    <div class="final-wrap">
-        {final_recommendations_html(predictions)}
-    </div>
-
-    <h2>昨日驗證</h2>
-    {yesterday_top3_summary_html(yesterday_verify)}
-
-    <div class="section">
-        {yesterday_table}
-    </div>
+    {yesterday_section_html}
 
     <div class="cards">
         <div class="card">
