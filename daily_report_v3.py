@@ -4286,6 +4286,22 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
     else:
         yesterday_section_html = ""
 
+    champion_info = stable_get_champion_info()
+    season_compact_html = f"""
+    <details class="season-details">
+        <summary>
+            🏆 {stable_season_label(TODAY_TW)} 摘要｜
+            總冠軍：{champion_info.get('champion', '—')}｜
+            總冠軍賽：{champion_info.get('series_text', '—')}｜
+            Top3：{win_rates.get('top3_30', '0/0（0.0%）')}｜
+            總勝率：{win_rates.get('season_current', '0/0（0.0%）')}
+        </summary>
+        <div class="season-details-body">
+            {season_dashboard_html}
+        </div>
+    </details>
+"""
+
     html = f"""
 <!DOCTYPE html>
 <html lang="zh-Hant">
@@ -4329,6 +4345,45 @@ h2 {{
     margin: 12px 0;
     font-size: 18px;
     font-weight: 900;
+}}
+
+.season-details {{
+    background: #fffdf8;
+    border: 1px solid #eadfce;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(90, 65, 30, 0.08);
+    margin: 26px 0 14px;
+    padding: 0;
+}}
+
+.season-details summary {{
+    cursor: pointer;
+    list-style: none;
+    padding: 16px 18px;
+    font-size: 17px;
+    font-weight: 900;
+    color: #2b2b2b;
+}}
+
+.season-details summary::-webkit-details-marker {{
+    display: none;
+}}
+
+.season-details summary::after {{
+    content: "展開";
+    float: right;
+    color: #8a765c;
+    font-size: 13px;
+    font-weight: 800;
+}}
+
+.season-details[open] summary::after {{
+    content: "收合";
+}}
+
+.season-details-body {{
+    border-top: 1px solid #eadfce;
+    padding: 16px 18px 18px;
 }}
 
 .cards {{
@@ -4599,11 +4654,6 @@ h2 {{
 <div class="container">
     <h1>{report_title}</h1>
     <div class="subtitle">{report_subtitle}</div>
-
-    <h2>{stable_season_label(TODAY_TW)} 總覽</h2>
-    <div class="section">
-        {season_dashboard_html}
-    </div>
 
     {tomorrow_section_html}
 

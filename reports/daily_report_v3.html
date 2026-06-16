@@ -43,6 +43,45 @@ h2 {
     font-weight: 900;
 }
 
+.season-details {
+    background: #fffdf8;
+    border: 1px solid #eadfce;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(90, 65, 30, 0.08);
+    margin: 26px 0 14px;
+    padding: 0;
+}
+
+.season-details summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 16px 18px;
+    font-size: 17px;
+    font-weight: 900;
+    color: #2b2b2b;
+}
+
+.season-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.season-details summary::after {
+    content: "展開";
+    float: right;
+    color: #8a765c;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.season-details[open] summary::after {
+    content: "收合";
+}
+
+.season-details-body {
+    border-top: 1px solid #eadfce;
+    padding: 16px 18px 18px;
+}
+
 .cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -310,51 +349,7 @@ h2 {
 <body>
 <div class="container">
     <h1>NBA 2026 賽季 結算報告</h1>
-    <div class="subtitle">產生時間：2026-06-16 19:46:32｜賽季結算 / 休賽期封存</div>
-
-    <h2>2026 賽季 總覽</h2>
-    <div class="section">
-        
-    <div class="verify-summary">
-        🏆 2026 賽季｜總冠軍：尼克｜
-        總冠軍賽：尼克 4-1 馬刺
-    </div>
-
-    <div class="cards">
-        <div class="card">
-            <div class="label">主推勝率</div>
-            <div class="value">4/9（44.4%）</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Top3 勝率</div>
-            <div class="value">10/18（55.6%）</div>
-        </div>
-
-        <div class="card">
-            <div class="label">2026 賽季 總勝率</div>
-            <div class="value">10/18（55.6%）</div>
-        </div>
-
-        <div class="card">
-            <div class="label">不推薦避開率</div>
-            <div class="value">1/2（50.0%）</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Finals 推薦勝率</div>
-            <div class="value">2/4（50.0%）</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Finals 避開率</div>
-            <div class="value">1/2（50.0%）</div>
-        </div>
-    </div>
-
-    <p class='empty'>資料提醒：Finals 有 1 場未存預測，不列入勝率。</p>
-    
-    </div>
+    <div class="subtitle">產生時間：2026-06-16 20:00:10｜賽季結算 / 休賽期封存</div>
 
     
 
