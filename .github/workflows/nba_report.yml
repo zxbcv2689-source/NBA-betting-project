@@ -5,12 +5,17 @@ permissions:
 
 on:
   schedule:
-    - cron: "30 0 * * *"   # 台灣 08:30 初盤觀察
-    - cron: "30 6 * * *"   # 台灣 14:30 傷兵更新版
-    - cron: "30 12 * * *"  # 台灣 20:30 晚間觀察
-    - cron: "30 21 * * *"  # 台灣 05:30 最終版
-    - cron: "30 23 * * *"  # 台灣 07:30 開賽前更新
+    - cron: "30 0 * * *"
+    - cron: "30 6 * * *"
+    - cron: "30 12 * * *"
+    - cron: "30 21 * * *"
+    - cron: "30 23 * * *"
   workflow_dispatch:
+
+env:
+  NBA_AUTO_START: "2026-10-15"
+  NBA_AUTO_END: "2027-06-30"
+  MIN_PREDICTION_ROWS: "10"
 
 concurrency:
   group: nba-report
@@ -23,19 +28,98 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check automation window
+        id: window
+        run: |
+          python - <<'PY2' >> "$GITHUB_OUTPUT"
+          import os
+          from datetime import datetime, timezone, timedelta, date
+
+          tw = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8))).date()
+          start = date.fromisoformat(os.environ["NBA_AUTO_START"])
+          end = date.fromisoformat(os.environ["NBA_AUTO_END"])
+          run_report = start <= tw <= end
+
+          print(f"today_tw={tw}")
+          print(f"run_report={'true' if run_report else 'false'}")
+          PY2
+
+      - name: Explain skipped schedule
+        if: github.event_name == 'schedule' && steps.window.outputs.run_report != 'true'
+        run: |
+          echo "Outside NBA automation window."
+          echo "Today Taiwan date: ${{ steps.window.outputs.today_tw }}"
+          echo "Allowed window: $NBA_AUTO_START to $NBA_AUTO_END"
+          echo "Skip without touching reports or data."
 
       - name: Set up Python
+        if: github.event_name == 'workflow_dispatch' || steps.window.outputs.run_report == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install dependencies
+        if: github.event_name == 'workflow_dispatch' || steps.window.outputs.run_report == 'true'
         run: pip install -r requirements.txt
 
       - name: Run daily report
+        if: github.event_name == 'workflow_dispatch' || steps.window.outputs.run_report == 'true'
         run: python daily_report_v3.py
 
+      - name: Validate generated outputs
+        if: github.event_name == 'workflow_dispatch' || steps.window.outputs.run_report == 'true'
+        run: |
+          python - <<'PY2'
+          import os
+          import sys
+          import pandas as pd
+          from pathlib import Path
+
+          min_rows = int(os.getenv("MIN_PREDICTION_ROWS", "10"))
+
+          check_files = [
+              Path("daily_report_v3.py"),
+              Path("reports/daily_report_v3.html"),
+              Path("data/prediction_log_v3.csv"),
+          ]
+
+          for path in check_files:
+              if not path.exists():
+                  raise SystemExit(f"Missing required file: {path}")
+
+              text = path.read_text(encoding="utf-8", errors="ignore")
+              if "<<<<<<<" in text or ">>>>>>>" in text or "\n=======\n" in text:
+                  raise SystemExit(f"Conflict marker found: {path}")
+
+          log_path = Path("data/prediction_log_v3.csv")
+
+          try:
+              df = pd.read_csv(log_path)
+          except Exception as e:
+              raise SystemExit(f"prediction_log_v3.csv is not readable: {e}")
+
+          if len(df) < min_rows:
+              raise SystemExit(f"prediction_log_v3.csv row count too low: {len(df)} < {min_rows}")
+
+          required_cols = ["預測目標日期", "推薦等級", "推薦狀態", "推薦內容", "信心分數"]
+          missing = [c for c in required_cols if c not in df.columns]
+          if missing:
+              raise SystemExit(f"prediction_log_v3.csv missing columns: {missing}")
+
+          html = Path("reports/daily_report_v3.html").read_text(encoding="utf-8", errors="ignore")
+          required_html = ["NBA", "賽季", "總冠軍"]
+          missing_html = [x for x in required_html if x not in html]
+          if missing_html:
+              raise SystemExit(f"HTML missing expected content: {missing_html}")
+
+          print("Validation passed.")
+          PY2
+
       - name: Commit daily report
+        if: github.event_name == 'workflow_dispatch' || steps.window.outputs.run_report == 'true'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
