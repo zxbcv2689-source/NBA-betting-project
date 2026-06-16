@@ -4673,6 +4673,381 @@ h2 {{
         font-size: 19px;
     }}
 }}
+
+
+/* NBA_DARK_UI_V1_START */
+:root {{
+    --nba-bg: #06111f;
+    --nba-bg-2: #0b1f36;
+    --nba-panel: rgba(255, 255, 255, 0.94);
+    --nba-panel-soft: rgba(255, 255, 255, 0.08);
+    --nba-border: rgba(77, 141, 230, 0.38);
+    --nba-blue: #1f6feb;
+    --nba-orange: #ff8a1c;
+    --nba-green: #20c56b;
+    --nba-red: #ef5350;
+    --nba-text: #10203a;
+    --nba-muted: #6b7890;
+    --nba-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+}}
+
+body {{
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 100vh;
+    color: var(--nba-text) !important;
+    background:
+        radial-gradient(circle at 82% 8%, rgba(255, 138, 28, 0.24), transparent 28%),
+        radial-gradient(circle at 12% 18%, rgba(31, 111, 235, 0.34), transparent 34%),
+        linear-gradient(135deg, #04101f 0%, #06172b 44%, #0b2340 100%) !important;
+}}
+
+body::before {{
+    content: "NBA 預測分析系統";
+    display: block;
+    padding: 18px 28px;
+    color: #ffffff;
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    background: rgba(2, 8, 18, 0.72);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}}
+
+.container {{
+    max-width: 1180px !important;
+    margin: 28px auto 42px !important;
+    padding: 0 22px 26px !important;
+}}
+
+h1 {{
+    margin: 0 0 8px !important;
+    padding: 34px 36px 4px !important;
+    color: #ffffff !important;
+    font-size: clamp(30px, 4vw, 48px) !important;
+    line-height: 1.12 !important;
+    letter-spacing: -0.04em !important;
+    text-shadow: 0 8px 26px rgba(0, 0, 0, 0.35);
+}}
+
+.subtitle {{
+    margin: 0 0 24px !important;
+    padding: 0 36px 24px !important;
+    color: rgba(255, 255, 255, 0.78) !important;
+    font-size: 15px !important;
+}}
+
+.subtitle::after {{
+    content: "｜目前狀態：2026 賽季已封存";
+    color: #ffb164;
+    font-weight: 800;
+}}
+
+h2 {{
+    color: #142847 !important;
+    font-size: 21px !important;
+    margin: 24px 0 14px !important;
+    padding: 0 !important;
+}}
+
+.section,
+.final-wrap,
+.season-details-body {{
+    background: rgba(255, 255, 255, 0.94) !important;
+    border: 1px solid rgba(31, 111, 235, 0.14) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 26px rgba(4, 18, 37, 0.08);
+}}
+
+.season-details {{
+    margin: 0 0 22px !important;
+    border: 1px solid rgba(70, 143, 255, 0.82) !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    background: linear-gradient(135deg, rgba(7, 28, 55, 0.98), rgba(8, 43, 82, 0.94)) !important;
+    box-shadow: var(--nba-shadow);
+}}
+
+.season-details > summary {{
+    list-style: none !important;
+    cursor: pointer !important;
+    padding: 18px 22px !important;
+    color: #ffffff !important;
+    font-size: 18px !important;
+    font-weight: 900 !important;
+    line-height: 1.7 !important;
+    background:
+        linear-gradient(90deg, rgba(255, 138, 28, 0.14), transparent 42%),
+        rgba(4, 20, 39, 0.88) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}}
+
+.season-details > summary::-webkit-details-marker {{
+    display: none;
+}}
+
+.season-details > summary::after {{
+    content: "已完成";
+    float: right;
+    margin-top: 2px;
+    padding: 4px 10px;
+    color: #ff9b38;
+    font-size: 13px;
+    font-weight: 900;
+    border: 1px solid rgba(255, 138, 28, 0.55);
+    border-radius: 999px;
+    background: rgba(255, 138, 28, 0.1);
+}}
+
+.season-details-body {{
+    margin: 0 !important;
+    padding: 22px !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}}
+
+.verify-summary {{
+    margin: 0 0 18px !important;
+    padding: 16px 18px !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 138, 28, 0.34) !important;
+    background:
+        linear-gradient(135deg, rgba(255, 138, 28, 0.18), rgba(31, 111, 235, 0.2)),
+        #0d2544 !important;
+}}
+
+.cards {{
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    margin: 18px 0 22px !important;
+}}
+
+.card {{
+    margin: 0 !important;
+    padding: 18px !important;
+    border-radius: 15px !important;
+    border: 1px solid rgba(31, 111, 235, 0.16) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%) !important;
+    box-shadow: 0 8px 22px rgba(10, 28, 55, 0.08) !important;
+}}
+
+.card .label,
+.label {{
+    color: #66758e !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+}}
+
+.card .value,
+.value {{
+    color: #0c1f3b !important;
+    font-size: 24px !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.03em !important;
+}}
+
+table.data-table,
+.dataframe.data-table {{
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #dce5f2 !important;
+    border-radius: 13px !important;
+    background: #ffffff !important;
+}}
+
+table.data-table th,
+.dataframe.data-table th {{
+    padding: 12px 10px !important;
+    color: #263a5c !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    background: #eef4fb !important;
+    border-bottom: 1px solid #d8e2ef !important;
+}}
+
+table.data-table td,
+.dataframe.data-table td {{
+    padding: 11px 10px !important;
+    color: #20314f !important;
+    font-size: 13px !important;
+    border-bottom: 1px solid #edf1f7 !important;
+}}
+
+table.data-table tr:last-child td,
+.dataframe.data-table tr:last-child td {{
+    border-bottom: 0 !important;
+}}
+
+table.data-table tr:nth-child(even) td,
+.dataframe.data-table tr:nth-child(even) td {{
+    background: #fafcff !important;
+}}
+
+.history-box {{
+    margin: 14px 0 !important;
+    border: 1px solid #d9e5f4 !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    box-shadow: 0 8px 20px rgba(10, 28, 55, 0.06) !important;
+}}
+
+.history-box > summary {{
+    cursor: pointer !important;
+    padding: 16px 18px !important;
+    color: #132846 !important;
+    font-weight: 900 !important;
+    background: linear-gradient(90deg, #f6faff, #ffffff) !important;
+}}
+
+.history-box:nth-of-type(2) > summary {{
+    background: linear-gradient(90deg, #fff8ed, #ffffff) !important;
+}}
+
+.empty {{
+    color: #526078 !important;
+    font-weight: 700 !important;
+}}
+
+p.empty {{
+    padding: 12px 0 !important;
+}}
+
+a {{
+    color: var(--nba-blue) !important;
+}}
+
+.container::after {{
+    content: "本報告資料僅供歷史回顧與研究分析使用，不作為任何投資或投注建議。";
+    display: block;
+    margin: 22px auto 0;
+    padding: 14px 18px;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 13px;
+    text-align: center;
+}}
+
+@media (max-width: 900px) {{
+    body::before {{
+        padding: 14px 18px;
+        font-size: 16px;
+    }}
+
+    .container {{
+        width: auto !important;
+        margin: 0 !important;
+        padding: 0 12px 24px !important;
+    }}
+
+    h1 {{
+        padding: 26px 8px 6px !important;
+        font-size: 29px !important;
+    }}
+
+    .subtitle {{
+        padding: 0 8px 18px !important;
+        font-size: 13px !important;
+        line-height: 1.7 !important;
+    }}
+
+    .subtitle::after {{
+        display: block;
+        margin-top: 4px;
+    }}
+
+    .season-details {{
+        border-radius: 15px !important;
+    }}
+
+    .season-details > summary {{
+        padding: 14px 14px !important;
+        font-size: 15px !important;
+        line-height: 1.65 !important;
+    }}
+
+    .season-details > summary::after {{
+        float: none;
+        display: inline-block;
+        margin-left: 8px;
+        vertical-align: 1px;
+    }}
+
+    .season-details-body {{
+        padding: 14px !important;
+    }}
+
+    h2 {{
+        font-size: 18px !important;
+        margin: 18px 0 10px !important;
+    }}
+
+    .cards {{
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }}
+
+    .card {{
+        padding: 14px !important;
+    }}
+
+    .card .value,
+    .value {{
+        font-size: 20px !important;
+    }}
+
+    .section,
+    .final-wrap {{
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        border-radius: 14px !important;
+    }}
+
+    table.data-table,
+    .dataframe.data-table {{
+        min-width: 720px !important;
+        font-size: 12px !important;
+    }}
+
+    table.data-table th,
+    table.data-table td,
+    .dataframe.data-table th,
+    .dataframe.data-table td {{
+        white-space: nowrap !important;
+        padding: 9px 8px !important;
+    }}
+
+    .history-box > summary {{
+        padding: 14px !important;
+        font-size: 14px !important;
+    }}
+}}
+
+@media (max-width: 520px) {{
+    .cards {{
+        grid-template-columns: 1fr !important;
+    }}
+
+    h1 {{
+        font-size: 26px !important;
+    }}
+
+    .season-details > summary {{
+        font-size: 14px !important;
+    }}
+
+    .container::after {{
+        font-size: 12px;
+        line-height: 1.6;
+    }}
+}}
+/* NBA_DARK_UI_V1_END */
+
 </style>
 </head>
 
