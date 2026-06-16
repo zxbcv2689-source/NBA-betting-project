@@ -1576,8 +1576,54 @@ def load_prediction_log():
     except Exception:
         return pd.DataFrame()
 
+
+def parse_confidence_percent(value):
+    """
+    統一把信心分數轉成百分比：
+    - 68% -> 68
+    - 68 -> 68
+    - 68/100 -> 68
+    - 34/50 -> 68
+    """
+    try:
+        if value is None:
+            return None
+        text = str(value).strip().replace("％", "%")
+        if not text or text.lower() == "nan":
+            return None
+        if "/" in text:
+            a, b = text.replace("%", "").split("/", 1)
+            return float(a) / float(b) * 100
+        return float(text.replace("%", ""))
+    except Exception:
+        return None
+
+
+def get_recommendation_status(confidence):
+    pct = parse_confidence_percent(confidence)
+    if pct is None:
+        return "推薦"
+    return "不推薦" if pct < 70 else "推薦"
+
+
+def is_effective_pick(row):
+    """
+    勝率統計用：以「筆數」往前抓滿。
+    排除無法驗證、未賽、空值，但不排除不推薦。
+    """
+    result = str(row.get("預測結果", "")).strip()
+    pick = str(row.get("推薦內容", "")).strip()
+    if not pick or pick.lower() == "nan":
+        return False
+    if "PASS" in pick.upper() and "原候選" not in pick:
+        return False
+    return result in ["過", "沒過", "走水"]
+
+
 def save_prediction_log(new_predictions):
     if new_predictions.empty:
+
+
         return
 
     final_recs = build_final_recommendations(new_predictions)
@@ -1593,60 +1639,54 @@ def save_prediction_log(new_predictions):
         "開盤大小分", "最新大小分", "大小分變動", "大小分盤口方向",
         "盤口變動摘要",
         "created_at",
-        "推薦等級", "推薦類型", "推薦內容", "信心分數", "預測優勢",
+        "推薦等級", "推薦狀態", "推薦類型", "推薦內容", "信心分數", "預測優勢",
         "盤口配合", "優勢絕對值", "優勢級距",
     ]
 
     rows = []
 
-    if len(final_recs) == 0:
-        save_df = pd.DataFrame(columns=keep_cols)
-    else:
-        for item in final_recs:
-            if item.get("推薦等級") == "PASS":
-                base = new_predictions.iloc[0]
-            else:
-                game_text = str(item.get("比賽", ""))
+    for item in final_recs:
+        game_text = str(item.get("比賽", ""))
 
-                mask = (
-                    new_predictions["台灣開賽時間"].astype(str).eq(str(item.get("台灣開賽時間", "")))
-                    & ((new_predictions["客隊"].astype(str) + " vs " + new_predictions["主隊"].astype(str)) == game_text)
-                )
+        mask = (
+            new_predictions["台灣開賽時間"].astype(str).eq(str(item.get("台灣開賽時間", "")))
+            & ((new_predictions["客隊"].astype(str) + " vs " + new_predictions["主隊"].astype(str)) == game_text)
+        )
 
-                if not mask.any():
-                    continue
+        if not mask.any():
+            continue
 
-                base = new_predictions.loc[mask].iloc[0]
+        base = new_predictions.loc[mask].iloc[0]
 
-            row = {}
+        row = {}
+        for col in keep_cols:
+            row[col] = base.get(col, "")
 
-            for col in keep_cols:
-                row[col] = base.get(col, "")
+        row["推薦等級"] = item.get("推薦等級", "")
+        row["推薦狀態"] = item.get("推薦狀態", "推薦")
+        row["推薦類型"] = item.get("類型", "")
+        row["推薦內容"] = item.get("推薦", "")
+        row["信心分數"] = item.get("信心分數", "")
+        row["預測優勢"] = item.get("預測優勢", "")
+        row["盤口配合"] = item.get("盤口配合", "盤口資料不足")
 
-            row["推薦等級"] = item.get("推薦等級", "")
-            row["推薦類型"] = item.get("類型", "")
-            row["推薦內容"] = item.get("推薦", "")
-            row["信心分數"] = item.get("信心分數", "")
-            row["預測優勢"] = item.get("預測優勢", "")
-            row["盤口配合"] = item.get("盤口配合", "盤口資料不足")
+        edge_value = abs(safe_float(item.get("預測優勢", 0), 0))
+        row["優勢絕對值"] = edge_value
 
-            edge_value = abs(safe_float(item.get("預測優勢", 0), 0))
-            row["優勢絕對值"] = edge_value
+        if edge_value >= 6.0:
+            row["優勢級距"] = ">=6.0"
+        elif edge_value >= 5.0:
+            row["優勢級距"] = ">=5.0"
+        elif edge_value >= 4.0:
+            row["優勢級距"] = ">=4.0"
+        elif edge_value >= 2.5:
+            row["優勢級距"] = ">=2.5"
+        else:
+            row["優勢級距"] = "<2.5"
 
-            if edge_value >= 6.0:
-                row["優勢級距"] = ">=6.0"
-            elif edge_value >= 5.0:
-                row["優勢級距"] = ">=5.0"
-            elif edge_value >= 4.0:
-                row["優勢級距"] = ">=4.0"
-            elif edge_value >= 2.5:
-                row["優勢級距"] = ">=2.5"
-            else:
-                row["優勢級距"] = "<2.5"
+        rows.append(row)
 
-            rows.append(row)
-
-        save_df = pd.DataFrame(rows)
+    save_df = pd.DataFrame(rows)
 
     old = load_prediction_log()
 
@@ -1655,14 +1695,32 @@ def save_prediction_log(new_predictions):
             if col not in old.columns:
                 old[col] = ""
 
-        old = old[
-            ~(
-                old["報告日期"].astype(str).eq(str(TODAY_TW))
-                & old["預測目標日期"].astype(str).eq(str(TOMORROW_TW))
-            )
+        existing_same_day = old[
+            old["報告日期"].astype(str).eq(str(TODAY_TW))
+            & old["預測目標日期"].astype(str).eq(str(TOMORROW_TW))
         ].copy()
 
-        combined = pd.concat([old, save_df], ignore_index=True)
+        if not existing_same_day.empty:
+            has_legacy_pass = (
+                existing_same_day["推薦等級"].fillna("").astype(str).eq("PASS").any()
+                or existing_same_day["推薦類型"].fillna("").astype(str).eq("觀望").any()
+                or existing_same_day["推薦狀態"].fillna("").astype(str).eq("").all()
+            )
+
+            if has_legacy_pass:
+                print("偵測到今日舊版 PASS / 舊欄位紀錄，改用新版 Top3 + 不推薦資料重建今日紀錄。")
+                keep_old = old[
+                    ~(
+                        old["報告日期"].astype(str).eq(str(TODAY_TW))
+                        & old["預測目標日期"].astype(str).eq(str(TOMORROW_TW))
+                    )
+                ].copy()
+                combined = pd.concat([keep_old, save_df], ignore_index=True)
+            else:
+                print("今日預測紀錄已存在，保留原始紀錄，不覆蓋 prediction_log_v3.csv")
+                combined = old.copy()
+        else:
+            combined = pd.concat([old, save_df], ignore_index=True)
     else:
         combined = save_df
 
@@ -1671,8 +1729,8 @@ def save_prediction_log(new_predictions):
             combined[col] = ""
 
     combined = combined[keep_cols]
-
     combined.to_csv(PREDICTION_LOG_CSV, index=False, encoding="utf-8-sig")
+
 
 
 def verify_yesterday_predictions():
@@ -1684,6 +1742,14 @@ def verify_yesterday_predictions():
         (pd.to_datetime(log["報告日期"], errors="coerce").dt.date == YESTERDAY_TW)
         & (pd.to_datetime(log["預測目標日期"], errors="coerce").dt.date == TODAY_TW)
     ].copy()
+
+    if target_log.empty:
+        return pd.DataFrame()
+
+    if "推薦狀態" in target_log.columns:
+        target_log = target_log[
+            target_log["推薦狀態"].fillna("推薦").astype(str).eq("推薦")
+        ].copy()
 
     if target_log.empty:
         return pd.DataFrame()
@@ -1700,13 +1766,11 @@ def verify_yesterday_predictions():
     merged = target_log.merge(results, on="game_id", how="left")
 
     verify_rows = []
-    for _, row in merged.iterrows():
-        if str(row.get("推薦等級", "")) == "PASS" or str(row.get("推薦類型", "")) == "觀望":
-            continue
 
+    for _, row in merged.iterrows():
         rec_level = normalize_rec_level(row.get("推薦等級", ""))
-        rec_type = str(row.get("推薦類型", ""))
-        rec_pick = str(row.get("推薦內容", ""))
+        rec_type = str(row.get("推薦類型", "")).strip()
+        rec_pick = str(row.get("推薦內容", "")).strip()
 
         if rec_level not in ["主推", "副推 1", "副推 2"]:
             continue
@@ -1722,12 +1786,10 @@ def verify_yesterday_predictions():
 
             elif rec_type == "大小分":
                 total_line = safe_float(row.get("total"), None)
-
                 if total_line is None:
                     result = "無法驗證"
                 else:
                     actual_total = away_score + home_score
-
                     if actual_total == total_line:
                         result = "走水"
                     elif "大分" in rec_pick or "Over" in rec_pick:
@@ -1739,7 +1801,6 @@ def verify_yesterday_predictions():
 
             elif rec_type == "讓分":
                 home_spread = safe_float(row.get("home_spread"), None)
-
                 if home_spread is None:
                     result = "無法驗證"
                 else:
@@ -1754,7 +1815,6 @@ def verify_yesterday_predictions():
                         result = "過" if home_cover_value < 0 else "沒過"
                     else:
                         result = "無法驗證"
-
             else:
                 result = "無法驗證"
 
@@ -1782,8 +1842,6 @@ def verify_yesterday_predictions():
 # =========================
 
 def calculate_win_rates():
-    log = load_prediction_log()
-
     output = {
         "main_7": "0/0（0.0%）",
         "main_30": "0/0（0.0%）",
@@ -1792,92 +1850,47 @@ def calculate_win_rates():
         "overall_7": "0/0（0.0%）",
         "overall_30": "0/0（0.0%）",
         "overall_all": "無資料",
+        "year_current": "0/0（0.0%）",
+        "season_current": "0/0（0.0%）",
+        "finals_current": "0/0（0.0%）",
+        "season_label": stable_season_label(TODAY_TW),
+        "year_label": str(TODAY_TW.year),
     }
 
-    if log.empty:
+    all_df = stable_build_verified_rows(include_no_recommend=False)
+
+    if all_df is None or all_df.empty:
         return output
 
-    today = TODAY_TW
-    all_verified = []
-
-    for d in log["預測目標日期"].dropna().unique():
-        try:
-            d = pd.to_datetime(d).date()
-
-            if d > today:
-                continue
-
-            verified = verify_predictions_for_date(d)
-
-            if not verified.empty:
-                verified["預測日期"] = str(d)
-                all_verified.append(verified)
-
-        except Exception:
-            continue
-
-    if not all_verified:
-        return output
-
-    all_df = pd.concat(all_verified, ignore_index=True)
-
-    if "推薦等級" in all_df.columns:
-        all_df = all_df[
-            all_df["推薦等級"]
-            .fillna("")
-            .astype(str)
-            .str.contains("主推|副推", na=False)
-        ].copy()
-
-    if "結果" in all_df.columns:
-        all_df = all_df[
-            all_df["結果"]
-            .fillna("")
-            .astype(str)
-            .str.contains("過|沒過", na=False)
-        ].copy()
-
-    if "推薦等級" in all_df.columns:
-        all_df = all_df[
-            ~all_df["推薦等級"]
-            .fillna("")
-            .astype(str)
-            .str.contains("PASS|觀望", na=False)
-        ].copy()
+    all_df = all_df[
+        all_df["推薦結果"].astype(str).isin(["過", "沒過", "走水"])
+    ].copy()
 
     if all_df.empty:
         return output
 
-    # 日期舊到新排序，再取最後 N 筆
-    if "預測日期" in all_df.columns:
-        all_df["排序日期"] = pd.to_datetime(all_df["預測日期"], errors="coerce")
-        all_df = all_df.sort_values("排序日期").drop(columns=["排序日期"])
+    all_df["_date"] = pd.to_datetime(all_df["預測目標日期"], errors="coerce")
+    all_df = all_df.sort_values("_date").drop(columns=["_date"], errors="ignore")
 
     for label, count in {"7": 7, "30": 30}.items():
-        recent_df = all_df.tail(count).copy()
+        main_recent_df = all_df[
+            all_df["推薦等級"].astype(str).str.contains("主推", na=False)
+        ].tail(count).copy()
 
-        output[f"main_{label}"] = format_final_pick_rate(
-            recent_df,
-            only_main=True
-        )
+        top3_recent_df = all_df[
+            all_df["推薦等級"].astype(str).str.contains("主推|副推", na=False)
+        ].tail(count).copy()
 
-        output[f"top3_{label}"] = format_final_pick_rate(
-            recent_df,
-            only_main=False
-        )
+        output[f"main_{label}"] = stable_rate_text(main_recent_df)
+        output[f"top3_{label}"] = stable_rate_text(top3_recent_df)
+        output[f"overall_{label}"] = stable_rate_text(top3_recent_df)
 
-        output[f"overall_{label}"] = format_final_pick_rate(
-            recent_df,
-            only_main=False
-        )
-
-    output["overall_all"] = format_final_pick_rate(
-        all_df,
-        only_main=False
-    )
+    output["overall_all"] = stable_rate_text(all_df)
+    output["year_current"] = stable_rate_text(stable_filter_current_year(all_df))
+    output["season_current"] = stable_rate_text(stable_filter_current_season(all_df))
+    output["finals_current"] = stable_rate_text(stable_filter_finals(all_df))
 
     return output
-
 def calculate_edge_bucket_rates():
     """V4-13：回測不同預測優勢級距的勝率。
 
@@ -2279,6 +2292,891 @@ def format_rate(df, col):
 
 
 # =========================
+# 穩定版報告補強：年度 / 本季 / NBA Finals / 缺漏檢查
+# =========================
+
+def stable_season_label(date_value=None):
+    """
+    顯示用賽季名稱：
+    - 2026 年 1～9 月：2026 賽季
+    - 2026 年 10～12 月：2027 賽季
+    也就是用「總冠軍產生年份 / 賽季結束年份」作為頁面顯示。
+    """
+    try:
+        d = pd.to_datetime(date_value if date_value is not None else TODAY_TW).date()
+    except Exception:
+        d = TODAY_TW
+
+    season_year = d.year + 1 if d.month >= 10 else d.year
+    return f"{season_year} 賽季"
+def stable_short_finals_game_label(text):
+    text = str(text).strip()
+
+    for n in range(1, 8):
+        if f"Game {n}" in text:
+            return f"G{n}"
+
+    return text or "Finals"
+
+
+def stable_score_text(row):
+    away = safe_float(row.get("away_score"), None)
+    home = safe_float(row.get("home_score"), None)
+
+    if away is None or home is None:
+        return "—"
+
+    return f"{safe_int(away)}-{safe_int(home)}"
+
+
+def stable_parse_original_pick(rec_type, rec_pick):
+    rec_type = str(rec_type).strip()
+    pick = str(rec_pick).strip()
+
+    if "原最佳候選：" in pick:
+        pick = pick.split("原最佳候選：", 1)[1].strip()
+    elif "原候選：" in pick:
+        pick = pick.split("原候選：", 1)[1].strip()
+
+    if rec_type in ["", "觀望", "PASS"]:
+        if any(k in pick for k in ["大分", "小分", "Over", "Under"]):
+            rec_type = "大小分"
+        else:
+            rec_type = "讓分"
+
+    return rec_type, pick
+
+
+def stable_calc_pick_result(row, allow_original_pick=False):
+    away_score = safe_float(row.get("away_score"), None)
+    home_score = safe_float(row.get("home_score"), None)
+
+    if away_score is None or home_score is None:
+        return "無法驗證"
+
+    if not row.get("completed", False):
+        return "未完賽"
+
+    rec_type = str(row.get("推薦類型", "")).strip()
+    rec_pick = str(row.get("推薦內容", "")).strip()
+
+    if allow_original_pick:
+        rec_type, rec_pick = stable_parse_original_pick(rec_type, rec_pick)
+
+    if rec_type == "大小分":
+        total_line = safe_float(row.get("total"), None)
+
+        if total_line is None:
+            return "無法驗證"
+
+        actual_total = away_score + home_score
+
+        if actual_total == total_line:
+            return "走水"
+
+        if "大分" in rec_pick or "Over" in rec_pick:
+            return "過" if actual_total > total_line else "沒過"
+
+        if "小分" in rec_pick or "Under" in rec_pick:
+            return "過" if actual_total < total_line else "沒過"
+
+        return "無法驗證"
+
+    if rec_type == "讓分":
+        home_spread = safe_float(row.get("home_spread"), None)
+
+        if home_spread is None:
+            return "無法驗證"
+
+        actual_home_margin = home_score - away_score
+        home_cover_value = actual_home_margin + home_spread
+
+        if home_cover_value == 0:
+            return "走水"
+
+        if str(row.get("主隊", "")) in rec_pick:
+            return "過" if home_cover_value > 0 else "沒過"
+
+        if str(row.get("客隊", "")) in rec_pick:
+            return "過" if home_cover_value < 0 else "沒過"
+
+        return "無法驗證"
+
+    return "無法驗證"
+
+
+def stable_refresh_finals_games():
+    """
+    補強 ESPN cache：抓今年 6/1 到今天的 Finals 賽程。
+    如果網路失敗，不中斷主程式，改用既有 cache。
+    """
+    start_date = datetime(TODAY_TW.year, 6, 1).date()
+    end_date = min(TODAY_TW, datetime(TODAY_TW.year, 6, 30).date())
+
+    frames = []
+
+    current = start_date
+    while current <= end_date:
+        try:
+            df = fetch_espn_games_by_taiwan_date(current)
+            if df is not None and not df.empty:
+                frames.append(df)
+        except Exception as e:
+            print("Finals 賽程補抓失敗：", current, e)
+
+        current += timedelta(days=1)
+
+    cache_df = load_espn_day_cache()
+    if cache_df is not None and not cache_df.empty:
+        frames.append(cache_df)
+
+    if not frames:
+        return pd.DataFrame()
+
+    games = pd.concat(frames, ignore_index=True)
+
+    if "game_id" in games.columns:
+        games["game_id"] = games["game_id"].astype(str)
+        games = games.drop_duplicates(subset=["game_id"], keep="last")
+
+    return games
+
+
+def stable_get_finals_games():
+    games = stable_refresh_finals_games()
+
+    if games is None or games.empty:
+        return pd.DataFrame()
+
+    temp = games.copy()
+
+    if "series_info" not in temp.columns:
+        temp["series_info"] = ""
+
+    finals_mask = temp["series_info"].fillna("").astype(str).str.contains("NBA Finals", case=False, na=False)
+
+    # 保險：今年 6 月 NYK/SAS 對戰也視為 Finals 候選，但優先仍用 series_info
+    if "台灣日期" in temp.columns and "客隊" in temp.columns and "主隊" in temp.columns:
+        temp["_date"] = pd.to_datetime(temp["台灣日期"], errors="coerce").dt.date
+        june_mask = temp["_date"].apply(lambda d: bool(d and d.month == 6 and d.year == TODAY_TW.year))
+
+        team_text = (
+            temp["客隊"].fillna("").astype(str)
+            + " "
+            + temp["主隊"].fillna("").astype(str)
+        )
+
+        matchup_mask = (
+            team_text.str.contains("New York Knicks", na=False)
+            & team_text.str.contains("San Antonio Spurs", na=False)
+            & june_mask
+        )
+
+        finals_mask = finals_mask | matchup_mask
+
+    temp = temp[finals_mask].copy()
+
+    if temp.empty:
+        return temp
+
+    if "台灣開賽時間" in temp.columns:
+        temp["_sort"] = pd.to_datetime(temp["台灣開賽時間"], errors="coerce")
+        temp = temp.sort_values("_sort").drop(columns=["_sort"], errors="ignore")
+
+    return temp
+
+
+def stable_build_verified_rows(include_no_recommend=False):
+    log = load_prediction_log()
+
+    if log.empty:
+        return pd.DataFrame()
+
+    rows = []
+
+    for d in log["預測目標日期"].dropna().unique():
+        try:
+            check_date = pd.to_datetime(d).date()
+
+            if check_date > TODAY_TW:
+                continue
+
+            results = fetch_espn_games_by_taiwan_date(check_date)
+
+            if results is None or results.empty:
+                continue
+
+            keep_cols = [
+                c for c in [
+                    "game_id", "away_score", "home_score", "completed",
+                    "status", "series_info"
+                ]
+                if c in results.columns
+            ]
+
+            day_log = log[log["預測目標日期"].astype(str).eq(str(check_date))].copy()
+
+            if day_log.empty:
+                continue
+
+            day_log["game_id"] = day_log["game_id"].astype(str)
+            results["game_id"] = results["game_id"].astype(str)
+
+            merged = day_log.merge(results[keep_cols], on="game_id", how="left")
+
+            for _, row in merged.iterrows():
+                rec_status = str(row.get("推薦狀態", "推薦")).strip() or "推薦"
+                rec_level = normalize_rec_level(row.get("推薦等級", ""))
+                rec_type = str(row.get("推薦類型", "")).strip()
+                rec_pick = str(row.get("推薦內容", "")).strip()
+
+                if not include_no_recommend and rec_status != "推薦":
+                    continue
+
+                if rec_level not in ["主推", "副推 1", "副推 2"]:
+                    continue
+
+                if str(row.get("推薦等級", "")).upper() == "PASS" or rec_type == "觀望":
+                    if not include_no_recommend:
+                        continue
+
+                result = stable_calc_pick_result(
+                    row,
+                    allow_original_pick=(rec_status == "不推薦")
+                )
+
+                if result not in ["過", "沒過", "走水"]:
+                    continue
+
+                rows.append({
+                    "預測目標日期": str(check_date),
+                    "推薦等級": rec_level,
+                    "推薦狀態": rec_status,
+                    "推薦類型": rec_type,
+                    "推薦內容": rec_pick,
+                    "推薦結果": result,
+                    "series_info": str(row.get("series_info", "")),
+                    "game_id": str(row.get("game_id", "")),
+                })
+
+        except Exception as e:
+            print("穩定版勝率略過日期：", d, e)
+            continue
+
+    return pd.DataFrame(rows)
+
+
+def stable_rate_text(df):
+    if df is None or df.empty:
+        return "0/0（0.0%）"
+
+    temp = df.copy()
+    temp = temp[temp["推薦結果"].astype(str).isin(["過", "沒過", "走水"])].copy()
+
+    total = len(temp)
+    win = int(temp["推薦結果"].astype(str).eq("過").sum())
+
+    if total == 0:
+        return "0/0（0.0%）"
+
+    return f"{win}/{total}（{win / total * 100:.1f}%）"
+
+
+def stable_filter_current_season(df):
+    if df is None or df.empty or "預測目標日期" not in df.columns:
+        return pd.DataFrame()
+
+    season = stable_season_label(TODAY_TW)
+    temp = df.copy()
+    temp["_season"] = temp["預測目標日期"].apply(stable_season_label)
+
+    return temp[temp["_season"].eq(season)].drop(columns=["_season"], errors="ignore")
+
+
+def stable_filter_current_year(df):
+    if df is None or df.empty or "預測目標日期" not in df.columns:
+        return pd.DataFrame()
+
+    temp = df.copy()
+    temp["_year"] = pd.to_datetime(temp["預測目標日期"], errors="coerce").dt.year
+
+    return temp[temp["_year"].eq(TODAY_TW.year)].drop(columns=["_year"], errors="ignore")
+
+
+def stable_filter_finals(df):
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    if "series_info" not in df.columns:
+        return pd.DataFrame()
+
+    return df[
+        df["series_info"]
+        .fillna("")
+        .astype(str)
+        .str.contains("NBA Finals", case=False, na=False)
+    ].copy()
+
+
+def build_data_health_html():
+    log = load_prediction_log()
+    cache = load_espn_day_cache()
+    finals_games = stable_get_finals_games()
+
+    rows = []
+
+    rows.append({
+        "項目": "正式報告入口",
+        "狀態": "reports/daily_report_v3.html",
+        "備註": "以這個檔案為唯一正式報告"
+    })
+
+    if log is None or log.empty:
+        rows.append({
+            "項目": "預測紀錄 CSV",
+            "狀態": "無資料",
+            "備註": "找不到可統計的 prediction_log_v3.csv"
+        })
+    else:
+        latest_log_date = "—"
+        if "預測目標日期" in log.columns:
+            latest_log_date = str(log["預測目標日期"].dropna().astype(str).max())
+
+        rows.append({
+            "項目": "預測紀錄 CSV",
+            "狀態": f"{len(log)} 筆",
+            "備註": f"最新預測目標日期：{latest_log_date}"
+        })
+
+    if cache is None or cache.empty:
+        rows.append({
+            "項目": "ESPN 賽果快取",
+            "狀態": "無資料",
+            "備註": "目前沒有 espn_day_cache.csv 可檢查"
+        })
+    else:
+        latest_cache_date = "—"
+        if "台灣日期" in cache.columns:
+            latest_cache_date = str(cache["台灣日期"].dropna().astype(str).max())
+
+        rows.append({
+            "項目": "ESPN 賽果快取",
+            "狀態": f"{len(cache)} 筆",
+            "備註": f"最新賽果日期：{latest_cache_date}"
+        })
+
+    missing_notes = []
+
+    if finals_games is not None and not finals_games.empty and log is not None and not log.empty:
+        log_game_ids = set(log["game_id"].astype(str)) if "game_id" in log.columns else set()
+
+        for _, game in finals_games.iterrows():
+            if not bool(game.get("completed", False)):
+                continue
+
+            game_id = str(game.get("game_id", ""))
+            if game_id and game_id not in log_game_ids:
+                date_text = str(game.get("台灣日期", "")) or str(game.get("台灣開賽時間", ""))[:10]
+                matchup = f"{short_name(game.get('客隊'))} vs {short_name(game.get('主隊'))}"
+                score = stable_score_text(game)
+                game_label = stable_short_finals_game_label(game.get("series_info", ""))
+                missing_notes.append(f"{date_text}｜{game_label}｜{matchup}｜{score}｜有賽果但沒有預測紀錄")
+
+    if missing_notes:
+        display_notes = missing_notes[:10]
+        if len(missing_notes) > 10:
+            display_notes.append(f"另外還有 {len(missing_notes) - 10} 場未顯示，請檢查 CSV 或 ESPN cache。")
+
+        rows.append({
+            "項目": "漏跑 / 未存預測",
+            "狀態": f"{len(missing_notes)} 場",
+            "備註": "<br>".join(display_notes)
+        })
+    else:
+        rows.append({
+            "項目": "漏跑 / 未存預測",
+            "狀態": "目前未偵測到 Finals 缺漏",
+            "備註": "以目前 ESPN cache 與 prediction_log_v3.csv 比對"
+        })
+
+    return pd.DataFrame(rows).to_html(index=False, escape=False, classes="data-table")
+def build_finals_report_html():
+    finals_games = stable_get_finals_games()
+    log = load_prediction_log()
+
+    if finals_games is None or finals_games.empty:
+        return "<p class='empty'>目前沒有抓到 NBA Finals 賽程 / 賽果。</p>"
+
+    # ===== 總冠軍 / 系列賽摘要 =====
+    wins = {}
+
+    completed_games = finals_games[
+        finals_games.get("completed", pd.Series(dtype=bool)).astype(bool)
+    ].copy() if "completed" in finals_games.columns else pd.DataFrame()
+
+    if completed_games is not None and not completed_games.empty:
+        for _, game in completed_games.iterrows():
+            away_team = str(game.get("客隊", "")).strip()
+            home_team = str(game.get("主隊", "")).strip()
+            away_score = safe_float(game.get("away_score"), None)
+            home_score = safe_float(game.get("home_score"), None)
+
+            if not away_team or not home_team or away_score is None or home_score is None:
+                continue
+
+            wins.setdefault(away_team, 0)
+            wins.setdefault(home_team, 0)
+
+            if away_score > home_score:
+                wins[away_team] += 1
+            elif home_score > away_score:
+                wins[home_team] += 1
+
+    champion_html = ""
+
+    if wins:
+        sorted_wins = sorted(wins.items(), key=lambda x: x[1], reverse=True)
+        leader, leader_wins = sorted_wins[0]
+        opponent, opponent_wins = sorted_wins[1] if len(sorted_wins) > 1 else ("", 0)
+
+        if leader_wins >= 4:
+            champion_html = f"""
+            <div class="verify-summary">
+                🏆 總冠軍：{short_name(leader)}｜
+                系列賽：{short_name(leader)} {leader_wins}-{opponent_wins} {short_name(opponent)}
+            </div>
+            """
+        else:
+            champion_html = f"""
+            <div class="verify-summary">
+                Finals 系列賽目前：{short_name(leader)} {leader_wins}-{opponent_wins} {short_name(opponent)}
+            </div>
+            """
+
+    rows = []
+
+    for _, game in finals_games.iterrows():
+        game_id = str(game.get("game_id", ""))
+        date_text = str(game.get("台灣日期", "")) or str(game.get("台灣開賽時間", ""))[:10]
+        matchup = f"{short_name(game.get('客隊'))} vs {short_name(game.get('主隊'))}"
+        score = stable_score_text(game)
+        series_info = stable_short_finals_game_label(game.get("series_info", ""))
+
+        game_log = pd.DataFrame()
+        if log is not None and not log.empty and "game_id" in log.columns:
+            game_log = log[log["game_id"].astype(str).eq(game_id)].copy()
+
+        if game_log.empty:
+            rows.append({
+                "日期": date_text,
+                "場次": series_info,
+                "隊伍": matchup,
+                "比分": score,
+                "預測狀態": "未存預測",
+                "預測": "—",
+                "預測結果": "不列入勝率",
+            })
+            continue
+
+        for _, pick_row in game_log.iterrows():
+            merged_row = pick_row.copy()
+            for col in ["away_score", "home_score", "completed", "series_info"]:
+                merged_row[col] = game.get(col, "")
+
+            rec_status = str(pick_row.get("推薦狀態", "推薦")).strip() or "推薦"
+            rec_type, rec_pick = stable_parse_original_pick(
+                pick_row.get("推薦類型", ""),
+                pick_row.get("推薦內容", "")
+            )
+
+            raw_result = stable_calc_pick_result(
+                merged_row,
+                allow_original_pick=(rec_status == "不推薦")
+            )
+
+            if rec_status == "不推薦":
+                if raw_result == "沒過":
+                    display_result = "✅ 避開成功"
+                elif raw_result == "過":
+                    display_result = "❌ 避開失敗"
+                elif raw_result == "走水":
+                    display_result = "➖ 走水"
+                else:
+                    display_result = "—"
+                status_text = "不推薦"
+            else:
+                display_result = result_display(raw_result)
+                status_text = "推薦"
+
+            rows.append({
+                "日期": date_text,
+                "場次": series_info,
+                "隊伍": matchup,
+                "比分": score,
+                "預測狀態": status_text,
+                "預測": f"{final_level_display(pick_row.get('推薦等級', ''))}｜{pick_short_name(rec_pick)}",
+                "預測結果": display_result,
+            })
+
+    table_html = pd.DataFrame(rows).to_html(index=False, escape=False, classes="data-table")
+
+    verified = stable_build_verified_rows(include_no_recommend=False)
+    finals_verified = stable_filter_finals(verified)
+
+    summary = f"""
+    <p class="empty">
+        NBA Finals 推薦勝率：{stable_rate_text(finals_verified)}｜
+        未存預測的 Finals 場次會顯示在表格，但不列入勝率。
+    </p>
+    """
+
+    return champion_html + summary + table_html
+def stable_season_year(date_value=None):
+    try:
+        d = pd.to_datetime(date_value if date_value is not None else TODAY_TW).date()
+    except Exception:
+        d = TODAY_TW
+
+    return d.year + 1 if d.month >= 10 else d.year
+
+
+def stable_get_champion_info():
+    finals_games = stable_get_finals_games()
+
+    if finals_games is None or finals_games.empty:
+        return {
+            "champion": "—",
+            "opponent": "—",
+            "champion_wins": 0,
+            "opponent_wins": 0,
+            "series_text": "尚無 Finals 資料",
+            "missing_finals": 0,
+        }
+
+    log = load_prediction_log()
+    log_game_ids = set()
+
+    if log is not None and not log.empty and "game_id" in log.columns:
+        log_game_ids = set(log["game_id"].astype(str))
+
+    wins = {}
+    missing_finals = 0
+
+    for _, game in finals_games.iterrows():
+        completed = bool(game.get("completed", False))
+        game_id = str(game.get("game_id", ""))
+
+        if completed and game_id and game_id not in log_game_ids:
+            missing_finals += 1
+
+        if not completed:
+            continue
+
+        away_team = str(game.get("客隊", "")).strip()
+        home_team = str(game.get("主隊", "")).strip()
+        away_score = safe_float(game.get("away_score"), None)
+        home_score = safe_float(game.get("home_score"), None)
+
+        if not away_team or not home_team or away_score is None or home_score is None:
+            continue
+
+        wins.setdefault(away_team, 0)
+        wins.setdefault(home_team, 0)
+
+        if away_score > home_score:
+            wins[away_team] += 1
+        elif home_score > away_score:
+            wins[home_team] += 1
+
+    if not wins:
+        return {
+            "champion": "—",
+            "opponent": "—",
+            "champion_wins": 0,
+            "opponent_wins": 0,
+            "series_text": "尚無已完賽 Finals 資料",
+            "missing_finals": missing_finals,
+        }
+
+    sorted_wins = sorted(wins.items(), key=lambda x: x[1], reverse=True)
+    leader, leader_wins = sorted_wins[0]
+    opponent, opponent_wins = sorted_wins[1] if len(sorted_wins) > 1 else ("", 0)
+
+    if leader_wins >= 4:
+        champion = short_name(leader)
+        series_text = f"{short_name(leader)} {leader_wins}-{opponent_wins} {short_name(opponent)}"
+    else:
+        champion = "尚未產生"
+        series_text = f"{short_name(leader)} {leader_wins}-{opponent_wins} {short_name(opponent)}"
+
+    return {
+        "champion": champion,
+        "opponent": short_name(opponent),
+        "champion_wins": leader_wins,
+        "opponent_wins": opponent_wins,
+        "series_text": series_text,
+        "missing_finals": missing_finals,
+    }
+
+
+def stable_build_no_recommend_rows():
+    log = load_prediction_log()
+
+    if log is None or log.empty:
+        return pd.DataFrame()
+
+    if "推薦狀態" not in log.columns:
+        log["推薦狀態"] = ""
+
+    no_df = log[
+        log["推薦狀態"].fillna("").astype(str).eq("不推薦")
+        | log["推薦等級"].fillna("").astype(str).eq("PASS")
+        | log["推薦類型"].fillna("").astype(str).eq("觀望")
+    ].copy()
+
+    if no_df.empty:
+        return pd.DataFrame()
+
+    rows = []
+
+    for d in no_df["預測目標日期"].dropna().unique():
+        try:
+            check_date = pd.to_datetime(d).date()
+
+            if check_date > TODAY_TW:
+                continue
+
+            results = fetch_espn_games_by_taiwan_date(check_date)
+
+            if results is None or results.empty:
+                continue
+
+            keep_cols = [
+                c for c in [
+                    "game_id",
+                    "away_score",
+                    "home_score",
+                    "completed",
+                    "series_info"
+                ]
+                if c in results.columns
+            ]
+
+            day_log = no_df[no_df["預測目標日期"].astype(str).eq(str(check_date))].copy()
+
+            day_log["game_id"] = day_log["game_id"].astype(str)
+            results["game_id"] = results["game_id"].astype(str)
+
+            merged = day_log.merge(results[keep_cols], on="game_id", how="left")
+
+            for _, row in merged.iterrows():
+                raw = stable_calc_pick_result(row, allow_original_pick=True)
+
+                if raw == "沒過":
+                    avoid_result = "避開成功"
+                elif raw == "過":
+                    avoid_result = "避開失敗"
+                elif raw == "走水":
+                    avoid_result = "走水"
+                else:
+                    avoid_result = "無法驗證"
+
+                if avoid_result not in ["避開成功", "避開失敗", "走水"]:
+                    continue
+
+                rows.append({
+                    "預測目標日期": str(check_date),
+                    "推薦內容": row.get("推薦內容", ""),
+                    "避開結果": avoid_result,
+                    "series_info": str(row.get("series_info", "")),
+                    "game_id": str(row.get("game_id", "")),
+                })
+
+        except Exception as e:
+            print("不推薦避開率略過日期：", d, e)
+            continue
+
+    return pd.DataFrame(rows)
+
+
+def stable_avoid_rate_text(df):
+    if df is None or df.empty:
+        return "0/0（0.0%）"
+
+    temp = df[
+        df["避開結果"].astype(str).isin(["避開成功", "避開失敗"])
+    ].copy()
+
+    total = len(temp)
+
+    if total == 0:
+        return "0/0（0.0%）"
+
+    success = int(temp["避開結果"].astype(str).eq("避開成功").sum())
+    return f"{success}/{total}（{success / total * 100:.1f}%）"
+
+
+def stable_filter_no_recommend_finals(df):
+    if df is None or df.empty or "series_info" not in df.columns:
+        return pd.DataFrame()
+
+    return df[
+        df["series_info"]
+        .fillna("")
+        .astype(str)
+        .str.contains("NBA Finals", case=False, na=False)
+    ].copy()
+
+
+def stable_upsert_season_summary(summary_row):
+    summary_path = DATA_DIR / "season_summary.csv"
+
+    new_df = pd.DataFrame([summary_row])
+
+    if summary_path.exists():
+        try:
+            old = pd.read_csv(summary_path)
+        except Exception:
+            old = pd.DataFrame()
+    else:
+        old = pd.DataFrame()
+
+    if old.empty:
+        combined = new_df
+    else:
+        if "賽季年份" not in old.columns:
+            old["賽季年份"] = ""
+        combined = old[old["賽季年份"].astype(str) != str(summary_row["賽季年份"])].copy()
+        combined = pd.concat([combined, new_df], ignore_index=True)
+
+    combined["賽季年份"] = combined["賽季年份"].astype(str)
+    combined = combined.sort_values("賽季年份", ascending=False)
+
+    combined.to_csv(summary_path, index=False, encoding="utf-8-sig")
+
+
+def build_season_dashboard_html(win_rates):
+    season_year = stable_season_year(TODAY_TW)
+    season_label = stable_season_label(TODAY_TW)
+    champion = stable_get_champion_info()
+
+    verified = stable_build_verified_rows(include_no_recommend=False)
+    season_verified = stable_filter_current_season(verified)
+    finals_verified = stable_filter_finals(verified)
+
+    no_rows = stable_build_no_recommend_rows()
+    season_no_rows = stable_filter_current_season(no_rows)
+    finals_no_rows = stable_filter_no_recommend_finals(no_rows)
+
+    main_df = pd.DataFrame()
+    if season_verified is not None and not season_verified.empty:
+        main_df = season_verified[
+            season_verified["推薦等級"].astype(str).str.contains("主推", na=False)
+        ].copy()
+
+    season_main_rate = stable_rate_text(main_df)
+    season_top3_rate = stable_rate_text(season_verified)
+    season_total_rate = stable_rate_text(season_verified)
+    finals_rate = stable_rate_text(finals_verified)
+    season_avoid_rate = stable_avoid_rate_text(season_no_rows)
+    finals_avoid_rate = stable_avoid_rate_text(finals_no_rows)
+
+    stable_upsert_season_summary({
+        "賽季年份": season_year,
+        "賽季": season_label,
+        "總冠軍": champion.get("champion", "—"),
+        "總冠軍賽": champion.get("series_text", "—"),
+        "主推勝率": season_main_rate,
+        "Top3勝率": season_top3_rate,
+        "年度總勝率": season_total_rate,
+        "Finals勝率": finals_rate,
+        "不推薦避開率": season_avoid_rate,
+        "Finals避開率": finals_avoid_rate,
+        "未存預測場次": champion.get("missing_finals", 0),
+        "最後更新": tw_now_text(),
+    })
+
+    missing_text = ""
+    missing_count = int(champion.get("missing_finals", 0) or 0)
+
+    if missing_count > 0:
+        missing_text = f"<p class='empty'>資料提醒：Finals 有 {missing_count} 場未存預測，不列入勝率。</p>"
+
+    html = f"""
+    <div class="verify-summary">
+        🏆 {season_label}｜總冠軍：{champion.get('champion', '—')}｜
+        總冠軍賽：{champion.get('series_text', '—')}
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <div class="label">主推勝率</div>
+            <div class="value">{season_main_rate}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Top3 勝率</div>
+            <div class="value">{season_top3_rate}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">{season_label} 總勝率</div>
+            <div class="value">{season_total_rate}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">不推薦避開率</div>
+            <div class="value">{season_avoid_rate}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Finals 推薦勝率</div>
+            <div class="value">{finals_rate}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Finals 避開率</div>
+            <div class="value">{finals_avoid_rate}</div>
+        </div>
+    </div>
+
+    {missing_text}
+    """
+
+    return html
+
+
+def build_season_archive_html():
+    summary_path = DATA_DIR / "season_summary.csv"
+
+    if not summary_path.exists():
+        return "<p class='empty'>目前沒有歷年摘要。</p>"
+
+    try:
+        df = pd.read_csv(summary_path)
+    except Exception:
+        return "<p class='empty'>歷年摘要讀取失敗。</p>"
+
+    if df.empty:
+        return "<p class='empty'>目前沒有歷年摘要。</p>"
+
+    show_cols = [
+        "賽季",
+        "總冠軍",
+        "總冠軍賽",
+        "主推勝率",
+        "Top3勝率",
+        "年度總勝率",
+        "Finals勝率",
+        "不推薦避開率",
+        "未存預測場次",
+    ]
+
+    show_cols = [c for c in show_cols if c in df.columns]
+
+    return df[show_cols].to_html(index=False, escape=False, classes="data-table")
+
+# =========================
 # HTML 報告
 # =========================
 
@@ -2329,7 +3227,7 @@ def confidence_label(score):
     if score >= 70:
         return "高信心"
     if score >= 64:
-        return "可考慮"
+        return "不推薦"
     if score >= 58:
         return "低信心"
     return "不推薦"
@@ -2556,18 +3454,19 @@ def adjust_confidence_by_line(score, alignment_status):
 def build_final_recommendations(predictions):
     """建立最終推薦。
 
-    V4-11：
-    - 信心分數仍然由 confidence_score(edge) 決定。
-    - 不重做前面分數邏輯。
-    - 排序時先看信心分數，再看實際預測優勢大小。
-    - 避免同一個信心區間內，較小優勢的場次排在較大優勢前面。
+    新規則：
+    - 先從所有候選中依信心分數排序。
+    - 永遠保留 Top3 版位：主推 / 副推 1 / 副推 2。
+    - 信心分數 >= 70%：推薦。
+    - 信心分數 < 70%：不推薦。
+    - 不再產生「整天 PASS」資料。
     """
 
     if predictions is None or predictions.empty:
         return []
 
-    MAIN_MIN_SCORE = MAIN_PICK_MIN_CONFIDENCE
-    SECONDARY_MIN_SCORE = 64
+    RECOMMEND_MIN_SCORE = 70
+    MIN_EDGE_TO_ENTER_CANDIDATE = 2.5
 
     items = []
 
@@ -2581,39 +3480,38 @@ def build_final_recommendations(predictions):
 
             edge_value = abs(safe_float(edge, 0))
 
-            if edge_value < 2.5:
-                continue
+            if edge_value >= MIN_EDGE_TO_ENTER_CANDIDATE:
+                score = confidence_score(edge)
+                alignment = line_alignment_status(row, "大小分", row.get("大小分推薦", ""))
+                score = adjust_confidence_by_line(score, alignment)
 
-            score = confidence_score(edge)
-            alignment = line_alignment_status(row, "大小分", row.get("大小分推薦", ""))
-            score = adjust_confidence_by_line(score, alignment)
+                sample_games = min(
+                    safe_int(row.get("主隊近10場場數", 0), 0),
+                    safe_int(row.get("客隊近10場場數", 0), 0)
+                )
 
-            sample_games = min(
-                safe_int(row.get("主隊近10場場數", 0), 0),
-                safe_int(row.get("客隊近10場場數", 0), 0)
-            )
+                if sample_games < 5:
+                    score -= 8
+                elif sample_games < 8:
+                    score -= 4
 
-            if sample_games < 5:
-                score -= 8
-            elif sample_games < 8:
-                score -= 4
+                score = int(max(0, min(100, score)))
 
-            score = int(max(0, min(100, score)))
-
-            items.append({
-                "推薦等級": "",
-                "類型": "大小分",
-                "game_id": row.get("game_id", ""),
-                "台灣開賽時間": row.get("台灣開賽時間", ""),
-                "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
-                "推薦": row.get("大小分推薦", ""),
-                "信心分數": f"{score}%",
-                "信心分數數值": score,
-                "預測優勢": edge,
-                "排序優勢": edge_value,
-                "盤口配合": alignment,
-                "理由": row.get("大小分理由", ""),
-            })
+                items.append({
+                    "推薦等級": "",
+                    "推薦狀態": "推薦" if score >= RECOMMEND_MIN_SCORE else "不推薦",
+                    "類型": "大小分",
+                    "game_id": row.get("game_id", ""),
+                    "台灣開賽時間": row.get("台灣開賽時間", ""),
+                    "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
+                    "推薦": row.get("大小分推薦", ""),
+                    "信心分數": f"{score}%",
+                    "信心分數數值": score,
+                    "預測優勢": edge,
+                    "排序優勢": edge_value,
+                    "盤口配合": alignment,
+                    "理由": row.get("大小分理由", ""),
+                })
 
         if str(row.get("讓分推薦", "")) != "無盤口":
             edge = row.get("讓分優勢", 0)
@@ -2623,39 +3521,38 @@ def build_final_recommendations(predictions):
 
             edge_value = abs(safe_float(edge, 0))
 
-            if edge_value < 2.5:
-                continue
+            if edge_value >= MIN_EDGE_TO_ENTER_CANDIDATE:
+                score = confidence_score(edge)
+                alignment = line_alignment_status(row, "讓分", row.get("讓分推薦", ""))
+                score = adjust_confidence_by_line(score, alignment)
 
-            score = confidence_score(edge)
-            alignment = line_alignment_status(row, "讓分", row.get("讓分推薦", ""))
-            score = adjust_confidence_by_line(score, alignment)
+                sample_games = min(
+                    safe_int(row.get("主隊近10場場數", 0), 0),
+                    safe_int(row.get("客隊近10場場數", 0), 0)
+                )
 
-            sample_games = min(
-                safe_int(row.get("主隊近10場場數", 0), 0),
-                safe_int(row.get("客隊近10場場數", 0), 0)
-            )
+                if sample_games < 5:
+                    score -= 8
+                elif sample_games < 8:
+                    score -= 4
 
-            if sample_games < 5:
-                score -= 8
-            elif sample_games < 8:
-                score -= 4
+                score = int(max(0, min(100, score)))
 
-            score = int(max(0, min(100, score)))
-
-            items.append({
-                "推薦等級": "",
-                "類型": "讓分",
-                "game_id": row.get("game_id", ""),
-                "台灣開賽時間": row.get("台灣開賽時間", ""),
-                "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
-                "推薦": row.get("讓分推薦", ""),
-                "信心分數": f"{score}%",
-                "信心分數數值": score,
-                "預測優勢": edge,
-                "排序優勢": edge_value,
-                "盤口配合": alignment,
-                "理由": row.get("讓分理由", ""),
-            })
+                items.append({
+                    "推薦等級": "",
+                    "推薦狀態": "推薦" if score >= RECOMMEND_MIN_SCORE else "不推薦",
+                    "類型": "讓分",
+                    "game_id": row.get("game_id", ""),
+                    "台灣開賽時間": row.get("台灣開賽時間", ""),
+                    "比賽": f"{row.get('客隊', '')} vs {row.get('主隊', '')}",
+                    "推薦": row.get("讓分推薦", ""),
+                    "信心分數": f"{score}%",
+                    "信心分數數值": score,
+                    "預測優勢": edge,
+                    "排序優勢": edge_value,
+                    "盤口配合": alignment,
+                    "理由": row.get("讓分理由", ""),
+                })
 
     if len(items) == 0:
         return []
@@ -2669,32 +3566,13 @@ def build_final_recommendations(predictions):
         reverse=True
     )
 
-    if items[0].get("信心分數數值", 0) < MAIN_MIN_SCORE:
-        return [{
-            "推薦等級": "PASS",
-            "類型": "觀望",
-            "台灣開賽時間": "",
-            "比賽": "今日全部場次",
-            "推薦": "今日沒有達到主推門檻的選項",
-            "信心分數": f"{items[0].get('信心分數數值', 0)}%",
-            "信心分數數值": items[0].get("信心分數數值", 0),
-            "預測優勢": items[0].get("預測優勢", 0),
-            "理由": "最高分仍低於主推門檻，依照 V4 規則選擇不硬推，避免為了湊推薦而降低勝率。",
-        }]
-
     final_items = []
+    levels = ["主推", "副推 1", "副推 2"]
 
-    main_item = items[0]
-    main_item["推薦等級"] = "主推"
-    final_items.append(main_item)
-
-    secondary_items = [
-        item for item in items[1:]
-        if item.get("信心分數數值", 0) >= SECONDARY_MIN_SCORE
-    ]
-
-    for i, item in enumerate(secondary_items[:2], start=1):
-        item["推薦等級"] = f"副推 {i}"
+    for level, item in zip(levels, items[:3]):
+        item = item.copy()
+        item["推薦等級"] = level
+        item["推薦狀態"] = "推薦" if item.get("信心分數數值", 0) >= RECOMMEND_MIN_SCORE else "不推薦"
         final_items.append(item)
 
     return final_items
@@ -2737,6 +3615,7 @@ def final_recommendations_html(predictions):
             <div class="final-game">{short_name(away_name)} vs {short_name(home_name)}</div>
             <div class="final-pick">{pick_short_name(item['推薦'])}</div>
             <div class="final-score">
+                狀態：{item.get('推薦狀態', '推薦')}｜
                 信心：{item['信心分數']}｜
                 優勢：{item['預測優勢']} 分｜
                 盤口：{item.get('盤口配合', '盤口資料不足')}｜
@@ -2886,6 +3765,10 @@ def build_top3_cards(df, type_name):
 
 def generate_html_report(predictions, yesterday_verify, win_rates):
     summary_text = build_summary_text(win_rates)
+    season_dashboard_html = build_season_dashboard_html(win_rates)
+    season_archive_html = build_season_archive_html()
+    health_html = build_data_health_html()
+    finals_html = build_finals_report_html()
 
     # ===== 歷史紀錄 =====
     history_html = "<p class='empty'>目前沒有歷史紀錄。</p>"
@@ -2894,16 +3777,51 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
         history_df = load_prediction_log()
 
         if len(history_df) > 0:
-            history_show_df = history_df.tail(30).copy()
+            # 只保留一般歷史推薦：主推 / 副推
+            # 注意：必須先篩掉 PASS，再取最近 30 筆，避免 PASS 混入或佔掉名額
+            if "推薦等級" in history_df.columns:
+                level_text = history_df["推薦等級"].fillna("").astype(str).str.strip()
 
-            # 只保留新版 Top3：主推 / 副推
-            if "推薦等級" in history_show_df.columns:
-                history_show_df = history_show_df[
-                    history_show_df["推薦等級"]
-                    .fillna("")
-                    .astype(str)
-                    .str.contains("主推|副推", na=False)
+                history_show_df = history_df[
+                    level_text.isin([
+                        "🔥 主推",
+                        "🥈 副推 1",
+                        "🥉 副推 2",
+                        "主推",
+                        "副推 1",
+                        "副推 2",
+                    ])
                 ].copy()
+
+                if not history_show_df.empty and "推薦狀態" in history_show_df.columns:
+                    history_show_df = history_show_df[
+                        history_show_df["推薦狀態"].fillna("推薦").astype(str).eq("推薦")
+                    ].copy()
+
+                # 排除舊版低信心副推：
+                # 副推至少要 64%，否則視為新版 PASS/觀望，不放進一般歷史推薦。
+                if not history_show_df.empty and "信心分數" in history_show_df.columns:
+                    history_show_df["_信心百分比"] = history_show_df["信心分數"].apply(confidence_to_percent)
+                    history_show_df["_推薦等級標準"] = history_show_df["推薦等級"].apply(normalize_rec_level)
+
+                    history_show_df = history_show_df[
+                        (
+                            history_show_df["_推薦等級標準"].eq("主推")
+                            & (history_show_df["_信心百分比"] >= MAIN_PICK_MIN_CONFIDENCE)
+                        )
+                        |
+                        (
+                            history_show_df["_推薦等級標準"].isin(["副推 1", "副推 2"])
+                            & (history_show_df["_信心百分比"] >= 64)
+                        )
+                    ].copy()
+
+                    history_show_df = history_show_df.drop(
+                        columns=["_信心百分比", "_推薦等級標準"],
+                        errors="ignore"
+                    )
+
+                history_show_df = history_show_df.tail(30).copy()
             else:
                 history_show_df = pd.DataFrame()
 
@@ -3078,59 +3996,222 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
     else:
         history_html = "<p class='empty'>找不到 prediction_log_v3.csv。</p>"
 
-    # ===== PASS 歷史紀錄 =====
-    pass_history_html = "<p class='empty'>目前沒有 PASS 紀錄。</p>"
+    # ===== 不推薦歷史紀錄 =====
+    pass_history_html = "<p class='empty'>目前沒有不推薦紀錄。</p>"
 
     if PREDICTION_LOG_CSV.exists():
         pass_df = load_prediction_log()
 
-        if not pass_df.empty and "推薦等級" in pass_df.columns:
+        if not pass_df.empty:
+            if "推薦狀態" not in pass_df.columns:
+                pass_df["推薦狀態"] = ""
+
             pass_df = pass_df[
-                pass_df["推薦等級"].fillna("").astype(str).eq("PASS")
+                pass_df["推薦狀態"].fillna("").astype(str).eq("不推薦")
+                | pass_df["推薦等級"].fillna("").astype(str).eq("PASS")
+                | pass_df["推薦類型"].fillna("").astype(str).eq("觀望")
             ].copy()
 
             if not pass_df.empty:
                 if "預測目標日期" in pass_df.columns:
+                    pass_df["_日期檢查"] = pd.to_datetime(pass_df["預測目標日期"], errors="coerce").dt.date
+                    pass_df = pass_df[pass_df["_日期檢查"] <= TODAY_TW].copy()
+                    pass_df = pass_df.drop(columns=["_日期檢查"], errors="ignore")
+
+                results_list = []
+
+                if "預測目標日期" in pass_df.columns:
+                    for d in pass_df["預測目標日期"].dropna().unique():
+                        try:
+                            check_date = pd.to_datetime(d).date()
+
+                            if check_date > TODAY_TW:
+                                continue
+
+                            res = fetch_espn_games_by_taiwan_date(check_date)
+
+                            if res is not None and not res.empty:
+                                results_list.append(res)
+                        except Exception:
+                            continue
+
+                if results_list and "game_id" in pass_df.columns:
+                    results_df = pd.concat(results_list, ignore_index=True)
+
+                    if "game_id" in results_df.columns:
+                        results_df["game_id"] = results_df["game_id"].astype(str)
+                        pass_df["game_id"] = pass_df["game_id"].astype(str)
+
+                        keep_cols = [
+                            c for c in ["game_id", "away_score", "home_score", "completed"]
+                            if c in results_df.columns
+                        ]
+
+                        pass_df = pass_df.merge(
+                            results_df[keep_cols],
+                            on="game_id",
+                            how="left"
+                        )
+
+                def calc_no_recommend_counter_result(row):
+                    away = safe_float(row.get("away_score"), None)
+                    home = safe_float(row.get("home_score"), None)
+
+                    if not row.get("completed", False):
+                        return "尚未完賽"
+
+                    if away is None or home is None:
+                        return "無法驗證"
+
+                    rec_type = str(row.get("推薦類型", ""))
+                    rec_pick = str(row.get("推薦內容", ""))
+
+                    # 舊版不推薦資料格式：
+                    # PASS觀望｜原最佳候選：大分 215.5
+                    # 主推候選不推薦｜原候選：XXX
+                    if "原最佳候選：" in rec_pick:
+                        rec_pick = rec_pick.split("原最佳候選：", 1)[1].strip()
+                    elif "原候選：" in rec_pick:
+                        rec_pick = rec_pick.split("原候選：", 1)[1].strip()
+
+                    if rec_type in ["觀望", "PASS", ""]:
+                        if "大分" in rec_pick or "小分" in rec_pick or "Over" in rec_pick or "Under" in rec_pick:
+                            rec_type = "大小分"
+                        else:
+                            rec_type = "讓分"
+
+                    if rec_type == "大小分":
+                        total_line = safe_float(row.get("total"), None)
+
+                        if total_line is None:
+                            return "無法驗證"
+
+                        actual_total = away + home
+
+                        if actual_total == total_line:
+                            return "走水"
+
+                        if "大分" in rec_pick:
+                            return "原候選會過" if actual_total > total_line else "原候選沒過"
+
+                        if "小分" in rec_pick:
+                            return "原候選會過" if actual_total < total_line else "原候選沒過"
+
+                        return "無法驗證"
+
+                    if rec_type == "讓分":
+                        home_spread = safe_float(row.get("home_spread"), None)
+
+                        if home_spread is None:
+                            return "無法驗證"
+
+                        actual_home_margin = home - away
+                        home_cover_value = actual_home_margin + home_spread
+
+                        if home_cover_value == 0:
+                            return "走水"
+
+                        if str(row.get("主隊", "")) in rec_pick:
+                            return "原候選會過" if home_cover_value > 0 else "原候選沒過"
+
+                        if str(row.get("客隊", "")) in rec_pick:
+                            return "原候選會過" if home_cover_value < 0 else "原候選沒過"
+
+                        return "無法驗證"
+
+                    return "無法驗證"
+
+                pass_df["原候選結果"] = pass_df.apply(calc_no_recommend_counter_result, axis=1)
+
+                if "away_score" in pass_df.columns and "home_score" in pass_df.columns:
+                    pass_df["比賽分數"] = (
+                        pass_df["away_score"].fillna("-").astype(str)
+                        + "-"
+                        + pass_df["home_score"].fillna("-").astype(str)
+                    )
+                else:
+                    pass_df["比賽分數"] = "—"
+
+                pass_df["隊伍"] = (
+                    pass_df["客隊"].apply(short_name).astype(str)
+                    + " vs "
+                    + pass_df["主隊"].apply(short_name).astype(str)
+                )
+
+                verified_pass_df = pass_df[
+                    pass_df["原候選結果"].astype(str).isin(["原候選沒過", "原候選會過"])
+                ].copy()
+
+                pass_total = len(verified_pass_df)
+                pass_success = int((verified_pass_df["原候選結果"] == "原候選沒過").sum())
+                pass_fail = int((verified_pass_df["原候選結果"] == "原候選會過").sum())
+                pass_rate = (pass_success / pass_total * 100) if pass_total else 0
+
+                pass_summary_html = f"""
+                <p class="empty">
+                    不推薦可驗證：{pass_total} 筆｜
+                    避開成功：{pass_success} 筆｜
+                    避開失敗：{pass_fail} 筆｜
+                    避開率：{pass_rate:.1f}%
+                </p>
+                """
+
+                if "預測目標日期" in pass_df.columns:
                     pass_df["排序日期"] = pd.to_datetime(pass_df["預測目標日期"], errors="coerce")
                     pass_df = pass_df.sort_values("排序日期", ascending=False).drop(columns=["排序日期"])
 
-                for col in ["預測目標日期", "推薦內容", "信心分數", "預測優勢", "盤口配合", "優勢級距"]:
+                def clean_no_recommend_pick(row):
+                    level = final_level_display(row.get("推薦等級", ""))
+                    pick = str(row.get("推薦內容", ""))
+
+                    if "原最佳候選：" in pick:
+                        pick = pick.split("原最佳候選：", 1)[1].strip()
+                    elif "原候選：" in pick:
+                        pick = pick.split("原候選：", 1)[1].strip()
+
+                    if level == "—":
+                        return f"不推薦｜{pick}"
+                    return f"不推薦｜{pick}"
+
+                def clean_no_recommend_result(value):
+                    value = str(value)
+
+                    if value == "原候選沒過":
+                        return "✅ 避開成功"
+                    if value == "原候選會過":
+                        return "❌ 避開失敗"
+                    if value == "走水":
+                        return "➖ 走水"
+
+                    return "—"
+
+                pass_df["預測"] = pass_df.apply(clean_no_recommend_pick, axis=1)
+                pass_df["預測結果"] = pass_df["原候選結果"].apply(clean_no_recommend_result)
+
+                for col in ["預測目標日期", "隊伍", "比賽分數", "預測", "預測結果"]:
                     if col not in pass_df.columns:
                         pass_df[col] = "—"
 
                 pass_df = pass_df[[
                     "預測目標日期",
-                    "推薦內容",
-                    "信心分數",
-                    "預測優勢",
-                    "盤口配合",
-                    "優勢級距",
+                    "隊伍",
+                    "比賽分數",
+                    "預測",
+                    "預測結果",
                 ]].head(30)
 
                 pass_df = pass_df.rename(columns={
                     "預測目標日期": "日期",
-                    "推薦內容": "內容",
                 })
 
-                pass_history_html = pass_df.to_html(
+                pass_history_html = pass_summary_html + pass_df.to_html(
                     index=False,
                     escape=False,
                     classes="data-table"
                 )
 
     # ===== 明日預測 =====
-    if predictions.empty:
-        top_total_html = "<p class='empty'>沒有大小分候選。</p>"
-        top_spread_html = "<p class='empty'>沒有讓分候選。</p>"
-        all_games_html = "<p class='empty'>明日沒有抓到 NBA 比賽。</p>"
-    else:
-        total_rank = predictions[predictions["大小分推薦"] != "無盤口"].sort_values("大小分優勢", ascending=False).copy()
-        spread_rank = predictions[predictions["讓分推薦"] != "無盤口"].sort_values("讓分優勢", ascending=False).copy()
-
-        top_total_html = build_top3_cards(total_rank, "大小分")
-        top_spread_html = build_top3_cards(spread_rank, "讓分")
-        all_games_html = simple_game_cards(predictions)
-
+    # 報告只保留「明日推薦」，不再另外顯示候選排行與每場預測，避免畫面太雜。
     # ===== 昨日驗證 =====
     if not yesterday_verify.empty:
         y_df = yesterday_verify.copy()
@@ -3479,6 +4560,11 @@ h2 {{
     <h1>NBA 明日預測報告</h1>
     <div class="subtitle">產生時間：{tw_now_text()}｜預測日期：{TOMORROW_TW}</div>
 
+    <h2>{stable_season_label(TODAY_TW)} 總覽</h2>
+    <div class="section">
+        {season_dashboard_html}
+    </div>
+
     <h2>明日推薦</h2>
 
     <div class="final-wrap">
@@ -3517,6 +4603,31 @@ h2 {{
             <div class="label">總勝率（全部累積）</div>
             <div class="value">{win_rates.get('overall_all', '無資料')}</div>
         </div>
+
+        <div class="card">
+            <div class="label">年度勝率（{win_rates.get('year_label', '')}）</div>
+            <div class="value">{win_rates.get('year_current', '0/0（0.0%）')}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">本季勝率（{win_rates.get('season_label', '')}）</div>
+            <div class="value">{win_rates.get('season_current', '0/0（0.0%）')}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">NBA Finals 勝率</div>
+            <div class="value">{win_rates.get('finals_current', '0/0（0.0%）')}</div>
+        </div>
+    </div>
+
+    <h2>NBA Finals / 總冠軍賽</h2>
+    <div class="section">
+        {finals_html}
+    </div>
+
+    <h2>歷年摘要</h2>
+    <div class="section">
+        {season_archive_html}
     </div>
 
     <details class="history-box">
@@ -3527,26 +4638,18 @@ h2 {{
     </details>
 
     <details class="history-box">
-        <summary>🟡 查看 PASS 觀望紀錄（最近 30 筆）</summary>
+        <summary>🟡 查看不推薦紀錄（最近 30 筆，不列入勝率）</summary>
         <div class="section" style="margin-top:14px;">
             {pass_history_html}
         </div>
     </details>
 
-    <h2>大小分 Top 3</h2>
+
+    <h2>資料狀態 / 缺漏檢查</h2>
     <div class="section">
-        {top_total_html}
+        {health_html}
     </div>
 
-    <h2>讓分 Top 3</h2>
-    <div class="section">
-        {top_spread_html}
-    </div>
-
-    <h2>每場預測</h2>
-    <div>
-        {all_games_html}
-    </div>
 </div>
 </body>
 </html>
