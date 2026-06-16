@@ -4258,6 +4258,8 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
 
     has_tomorrow_games = predictions is not None and not predictions.empty
     has_yesterday_verify = yesterday_verify is not None and not yesterday_verify.empty
+    show_live_summary = has_tomorrow_games or has_yesterday_verify
+    summary_section_html = summary_text if show_live_summary else ""
 
     if has_tomorrow_games:
         report_title = "NBA 明日預測報告"
@@ -4290,14 +4292,45 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
     season_compact_html = f"""
     <details class="season-details">
         <summary>
-            🏆 {stable_season_label(TODAY_TW)} 摘要｜
+            ▶ {stable_season_label(TODAY_TW)}｜
             總冠軍：{champion_info.get('champion', '—')}｜
             總冠軍賽：{champion_info.get('series_text', '—')}｜
             Top3：{win_rates.get('top3_30', '0/0（0.0%）')}｜
             總勝率：{win_rates.get('season_current', '0/0（0.0%）')}
         </summary>
+
         <div class="season-details-body">
+            <h2>{stable_season_label(TODAY_TW)} 勝率總覽</h2>
             {season_dashboard_html}
+
+            <h2>NBA Finals / 總冠軍賽</h2>
+            <div class="section">
+                {finals_html}
+            </div>
+
+            <h2>歷年摘要</h2>
+            <div class="section">
+                {season_archive_html}
+            </div>
+
+            <details class="history-box">
+                <summary>📂 查看歷史推薦紀錄（最近 30 筆）</summary>
+                <div class="section" style="margin-top:14px;">
+                    {history_html}
+                </div>
+            </details>
+
+            <details class="history-box">
+                <summary>🟡 查看不推薦紀錄（最近 30 筆，不列入勝率）</summary>
+                <div class="section" style="margin-top:14px;">
+                    {pass_history_html}
+                </div>
+            </details>
+
+            <h2>資料狀態 / 缺漏檢查</h2>
+            <div class="section">
+                {health_html}
+            </div>
         </div>
     </details>
 """
@@ -4659,79 +4692,9 @@ h2 {{
 
     {yesterday_section_html}
 
-    <div class="cards">
-        <div class="card">
-            <div class="label">主推（近 7 筆）</div>
-            <div class="value">{win_rates.get('main_7')}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">主推（近 30 筆）</div>
-            <div class="value">{win_rates.get('main_30')}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Top3（近 7 筆）</div>
-            <div class="value">{win_rates.get('top3_7')}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Top3（近 30 筆）</div>
-            <div class="value">{win_rates.get('top3_30')}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">總勝率（全部累積）</div>
-            <div class="value">{win_rates.get('overall_all', '無資料')}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">年度勝率（{win_rates.get('year_label', '')}）</div>
-            <div class="value">{win_rates.get('year_current', '0/0（0.0%）')}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">本季勝率（{win_rates.get('season_label', '')}）</div>
-            <div class="value">{win_rates.get('season_current', '0/0（0.0%）')}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">NBA Finals 勝率</div>
-            <div class="value">{win_rates.get('finals_current', '0/0（0.0%）')}</div>
-        </div>
-    </div>
+    {summary_section_html}
 
     {season_compact_html}
-
-    <h2>NBA Finals / 總冠軍賽</h2>
-    <div class="section">
-        {finals_html}
-    </div>
-
-    <h2>歷年摘要</h2>
-    <div class="section">
-        {season_archive_html}
-    </div>
-
-    <details class="history-box">
-        <summary>📂 查看歷史推薦紀錄（最近 30 筆）</summary>
-        <div class="section" style="margin-top:14px;">
-            {history_html}
-        </div>
-    </details>
-
-    <details class="history-box">
-        <summary>🟡 查看不推薦紀錄（最近 30 筆，不列入勝率）</summary>
-        <div class="section" style="margin-top:14px;">
-            {pass_history_html}
-        </div>
-    </details>
-
-
-    <h2>資料狀態 / 缺漏檢查</h2>
-    <div class="section">
-        {health_html}
-    </div>
 
 </div>
 </body>
