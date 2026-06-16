@@ -43,6 +43,12 @@ jobs:
           git add -f reports/*.html
           git add -f data/*.csv
 
-          git commit -m "Auto update NBA report" || echo "No changes to commit"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
 
-          git push
+          git commit -m "Auto update NBA report"
+
+          git pull --rebase origin main
+          git push origin main
