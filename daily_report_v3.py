@@ -16,6 +16,16 @@ import math
 import time
 import requests
 import pandas as pd
+
+_ORIGINAL_PD_READ_CSV = pd.read_csv
+
+def _read_csv_without_bom(*args, **kwargs):
+    df = _ORIGINAL_PD_READ_CSV(*args, **kwargs)
+    df.columns = [str(c).replace("\ufeff", "").strip() for c in df.columns]
+    return df
+
+pd.read_csv = _read_csv_without_bom
+
 from pathlib import Path
 HISTORY_CSV = Path("nba_pick_history.csv")
 from datetime import datetime, timedelta, timezone
