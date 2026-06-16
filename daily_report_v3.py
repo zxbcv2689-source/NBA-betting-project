@@ -4701,6 +4701,8 @@ h2 {{
         </div>
     </div>
 
+    {season_compact_html}
+
     <h2>NBA Finals / 總冠軍賽</h2>
     <div class="section">
         {finals_html}
