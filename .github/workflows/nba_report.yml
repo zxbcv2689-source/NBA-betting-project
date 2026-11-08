@@ -13,8 +13,6 @@ on:
   workflow_dispatch:
 
 env:
-  NBA_AUTO_START: "2026-10-15"
-  NBA_AUTO_END: "2027-06-30"
   MIN_PREDICTION_ROWS: "10"
 
 concurrency:
@@ -39,12 +37,15 @@ jobs:
           from datetime import datetime, timezone, timedelta, date
 
           tw = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8))).date()
-          start = date.fromisoformat(os.environ["NBA_AUTO_START"])
-          end = date.fromisoformat(os.environ["NBA_AUTO_END"])
+          start_year = tw.year if tw.month >= 10 else tw.year - 1
+          start = date(start_year, 10, 15)
+          end = date(start_year + 1, 6, 30)
           run_report = start <= tw <= end
 
           print(f"today_tw={tw}")
           print(f"run_report={'true' if run_report else 'false'}")
+          print(f"start_tw={start}")
+          print(f"end_tw={end}")
           PY2
 
       - name: Explain skipped schedule
@@ -52,8 +53,32 @@ jobs:
         run: |
           echo "Outside NBA automation window."
           echo "Today Taiwan date: ${{ steps.window.outputs.today_tw }}"
-          echo "Allowed window: $NBA_AUTO_START to $NBA_AUTO_END"
+          echo "Allowed window: ${{ steps.window.outputs.start_tw }} to ${{ steps.window.outputs.end_tw }}"
           echo "Skip without touching reports or data."
+
+      - name: Monthly off-season heartbeat
+        if: github.event_name == 'schedule' && github.event.schedule == '30 0 * * *' && steps.window.outputs.run_report != 'true'
+        run: |
+          python - <<'PY2'
+          from datetime import datetime, timezone, timedelta
+          from pathlib import Path
+          tw = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8))).date()
+          if tw.day == 1:
+              Path('data/automation_heartbeat.txt').write_text(f'Last maintenance (TW): {tw}\n', encoding='utf-8')
+              print('Monthly off-season heartbeat:', tw)
+          else:
+              print('No heartbeat due today.')
+          PY2
+          if [ -f data/automation_heartbeat.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -f data/automation_heartbeat.txt
+            if ! git diff --cached --quiet; then
+              git commit -m "Maintain NBA schedule during off-season"
+              git pull --rebase origin main
+              git push origin main
+            fi
+          fi
 
       - name: Set up Python
         if: github.event_name == 'workflow_dispatch' || steps.window.outputs.run_report == 'true'
@@ -91,7 +116,10 @@ jobs:
                   raise SystemExit(f"Missing required file: {path}")
 
               text = path.read_text(encoding="utf-8", errors="ignore")
-              if "<<<<<<<" in text or ">>>>>>>" in text or "\n=======\n" in text:
+              if any(
+                  line.strip().startswith(("<<<<<<<", ">>>>>>>")) or line.strip() == "======="
+                  for line in text.splitlines()
+              ):
                   raise SystemExit(f"Conflict marker found: {path}")
 
           log_path = Path("data/prediction_log_v3.csv")
@@ -125,6 +153,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           git add -f reports/*.html
+          if [ -d reports/archives ]; then
+            find reports/archives -type f -name '*.html' -exec git add -f -- {} +
+          fi
           git add -f data/*.csv
 
           if git diff --cached --quiet; then

@@ -1,5 +1,6 @@
 # daily_report_v3.py
 # NBA 預測分析專案
+# NBA_CROSS_SEASON_FIX_TESTED_20261108
 # 功能：
 # 1. 明日 NBA 賽程
 # 2. 大小分模型
@@ -294,48 +295,72 @@ def build_recent_games_cache(today_tw, lookback_days=60):
     return cache_df
 
 def get_recent_games_cache(today_tw):
-    global RECENT_GAMES_CACHE
+    """每日更新近況，避免 Git checkout 修改時間讓上一季快取永久有效。
 
+    舊快取第一次先全量重建；之後每日只增量更新最近幾天，
+    ESPN 暫時不可用時沿用當季舊資料，不偽稱已更新成功。
+    """
+    global RECENT_GAMES_CACHE
     if RECENT_GAMES_CACHE is not None:
         return RECENT_GAMES_CACHE
 
-    # ===== 先讀永久 cache =====
+    today_date = pd.to_datetime(today_tw).date()
+    current_season = stable_season_year(today_date)
     cache_df = load_recent_games_cache()
+    base = pd.DataFrame()
+    built_on = None
 
-    # ✅ 穩定優先：只要有舊快取，就先使用，避免 ESPN 卡住導致整份報告不更新
-    if not cache_df.empty:
-        cache_time = datetime.fromtimestamp(
-            RECENT_GAMES_CACHE_CSV.stat().st_mtime
-        ).date()
+    if not cache_df.empty and "台灣日期" in cache_df.columns:
+        base = cache_df.copy()
+        dates = pd.to_datetime(base["台灣日期"], errors="coerce")
+        keep = (
+            dates.notna()
+            & (dates.dt.date >= today_date - timedelta(days=60))
+            & dates.dt.date.apply(lambda d: stable_season_year(d) == current_season if pd.notna(d) else False)
+        )
+        base = base.loc[keep].copy()
+        if "_cache_built_on" in cache_df.columns:
+            dates_built = pd.to_datetime(cache_df["_cache_built_on"], errors="coerce").dropna()
+            if not dates_built.empty:
+                built_on = dates_built.max().date()
 
-        today_date = datetime.now(TAIWAN_TZ).date()
-
-        if cache_time == today_date:
-            print("已載入今日 recent_games_cache.csv")
-        else:
-            print(f"已載入舊 recent_games_cache.csv（{cache_time}），先用舊快取避免 ESPN 卡住")
-
-        RECENT_GAMES_CACHE = cache_df
-        print("近況資料筆數：", len(RECENT_GAMES_CACHE))
+    if not base.empty and built_on == today_date:
+        print("已載入今日當季 recent_games_cache.csv")
+        RECENT_GAMES_CACHE = base
         return RECENT_GAMES_CACHE
 
-    # ===== 完全沒有 cache，才重新建立 =====
-    print("正在建立近10場共用資料快取...")
-    RECENT_GAMES_CACHE = build_recent_games_cache(today_tw)
+    # 沒有當季快取、沒有可信建立日期、或長期未執行時需完整補抓。
+    if base.empty or built_on is None or (today_date - built_on).days > 7 or built_on > today_date:
+        print("當季近期戰績快取需重建，重新抓取近60天資料...")
+        fresh = build_recent_games_cache(today_date, lookback_days=60)
+    else:
+        days = max(2, min(7, (today_date - built_on).days + 2))
+        print(f"更新近況快取：補抓最近 {days} 天")
+        fresh = build_recent_games_cache(today_date, lookback_days=days)
 
-    print("近況資料筆數：", len(RECENT_GAMES_CACHE))
+    if fresh is None or fresh.empty:
+        if not base.empty:
+            print("近期比賽未抓到新賽果，沿用當季既有快取並標示未確認更新")
+            RECENT_GAMES_CACHE = base
+            return RECENT_GAMES_CACHE
+        RECENT_GAMES_CACHE = pd.DataFrame()
+        return RECENT_GAMES_CACHE
+
+    frames = [fresh] if base.empty else [base, fresh]
+    result = pd.concat(frames, ignore_index=True)
+    result = result.drop_duplicates(subset=["台灣日期", "客隊", "主隊"], keep="last")
+    result = result.sort_values("台灣日期", ascending=False).reset_index(drop=True)
+    result["_cache_built_on"] = str(today_date)
+    RECENT_GAMES_CACHE = result
 
     try:
-        RECENT_GAMES_CACHE.to_csv(
-            RECENT_GAMES_CACHE_CSV,
-            index=False,
-            encoding="utf-8-sig"
-        )
-        print("已儲存 recent_games_cache.csv")
-    except Exception as e:
-        print("儲存 recent_games_cache.csv 失敗：", e)
-
+        result.to_csv(RECENT_GAMES_CACHE_CSV, index=False, encoding="utf-8-sig")
+        print("已儲存當季近況快取：", len(result), "筆")
+    except Exception as error:
+        print("儲存近期快取失敗：", error)
     return RECENT_GAMES_CACHE
+
+
 def calc_recent_10_team_form(team_name, today_tw):
     """
     計算單一球隊近10場狀態：
@@ -573,7 +598,7 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
 
             # 今天 / 昨天可能還在更新比分
             # 不要直接使用舊 cache
-            if target_tw_date not in [TODAY_TW, YESTERDAY_TW]:
+            if target_tw_date not in [TODAY_TW, YESTERDAY_TW, TOMORROW_TW, TODAY_TW - timedelta(days=2)]:
 
                 ESPN_DAY_CACHE[cache_key] = cached_rows.copy()
 
@@ -872,6 +897,14 @@ def calculate_recent_power_adjust(team_abbr, max_games=10):
     }
 
     team_name = abbr_to_name.get(str(team_abbr).strip(), str(team_abbr).strip())
+
+    # 只使用當季賽事計算近期動態強度，避免去年季後賽被當成新球季近況。
+    date_col = "台灣日期" if "台灣日期" in df.columns else "台灣開賽時間"
+    if date_col in df.columns:
+        dates = pd.to_datetime(df[date_col], errors="coerce")
+        df = df[dates.apply(lambda d: pd.notna(d) and stable_season_year(d) == stable_season_year(TODAY_TW))].copy()
+        if df.empty:
+            return 0.0
 
     if "completed" in df.columns:
         completed_text = df["completed"].astype(str).str.lower()
@@ -1564,6 +1597,7 @@ def build_tomorrow_predictions():
         return games
 
     games = merge_lines(games)
+    get_recent_games_cache(TODAY_TW)  # 先更新再計算固定強度以外的動態調整
     pred_cols = games.apply(predict_game, axis=1)
     df = pd.concat([games, pred_cols], axis=1)
 
@@ -1882,13 +1916,14 @@ def calculate_win_rates():
     all_df["_date"] = pd.to_datetime(all_df["預測目標日期"], errors="coerce")
     all_df = all_df.sort_values("_date").drop(columns=["_date"], errors="ignore")
 
+    current_df = stable_filter_current_season(all_df)
     for label, count in {"7": 7, "30": 30}.items():
-        main_recent_df = all_df[
-            all_df["推薦等級"].astype(str).str.contains("主推", na=False)
+        main_recent_df = current_df[
+            current_df["推薦等級"].astype(str).str.contains("主推", na=False)
         ].tail(count).copy()
 
-        top3_recent_df = all_df[
-            all_df["推薦等級"].astype(str).str.contains("主推|副推", na=False)
+        top3_recent_df = current_df[
+            current_df["推薦等級"].astype(str).str.contains("主推|副推", na=False)
         ].tail(count).copy()
 
         output[f"main_{label}"] = stable_rate_text(main_recent_df)
@@ -2416,83 +2451,49 @@ def stable_calc_pick_result(row, allow_original_pick=False):
 
 
 def stable_refresh_finals_games():
-    """
-    補強 ESPN cache：抓今年 6/1 到今天的 Finals 賽程。
-    如果網路失敗，不中斷主程式，改用既有 cache。
-    """
-    start_date = datetime(TODAY_TW.year, 6, 1).date()
-    end_date = min(TODAY_TW, datetime(TODAY_TW.year, 6, 30).date())
-
+    """只在當季 6 月更新 Finals 資料；其他月份直接讀歷史 ESPN cache。"""
+    finals_year = stable_season_year(TODAY_TW)
     frames = []
-
-    current = start_date
-    while current <= end_date:
-        try:
-            df = fetch_espn_games_by_taiwan_date(current)
-            if df is not None and not df.empty:
-                frames.append(df)
-        except Exception as e:
-            print("Finals 賽程補抓失敗：", current, e)
-
-        current += timedelta(days=1)
+    if TODAY_TW.year == finals_year and TODAY_TW.month == 6:
+        current = datetime(finals_year, 6, 1).date()
+        while current <= TODAY_TW:
+            try:
+                df = fetch_espn_games_by_taiwan_date(current)
+                if df is not None and not df.empty:
+                    frames.append(df)
+            except Exception as error:
+                print("Finals 資料補抓失敗：", current, error)
+            current += timedelta(days=1)
 
     cache_df = load_espn_day_cache()
     if cache_df is not None and not cache_df.empty:
         frames.append(cache_df)
-
     if not frames:
         return pd.DataFrame()
-
     games = pd.concat(frames, ignore_index=True)
-
     if "game_id" in games.columns:
         games["game_id"] = games["game_id"].astype(str)
-        games = games.drop_duplicates(subset=["game_id"], keep="last")
-
+        games = games.drop_duplicates(subset=["game_id"], keep="first")
     return games
 
 
 def stable_get_finals_games():
     games = stable_refresh_finals_games()
-
-    if games is None or games.empty:
+    if games is None or games.empty or "series_info" not in games.columns:
         return pd.DataFrame()
 
     temp = games.copy()
-
-    if "series_info" not in temp.columns:
-        temp["series_info"] = ""
-
-    finals_mask = temp["series_info"].fillna("").astype(str).str.contains("NBA Finals", case=False, na=False)
-
-    # 保險：今年 6 月 NYK/SAS 對戰也視為 Finals 候選，但優先仍用 series_info
-    if "台灣日期" in temp.columns and "客隊" in temp.columns and "主隊" in temp.columns:
-        temp["_date"] = pd.to_datetime(temp["台灣日期"], errors="coerce").dt.date
-        june_mask = temp["_date"].apply(lambda d: bool(d and d.month == 6 and d.year == TODAY_TW.year))
-
-        team_text = (
-            temp["客隊"].fillna("").astype(str)
-            + " "
-            + temp["主隊"].fillna("").astype(str)
-        )
-
-        matchup_mask = (
-            team_text.str.contains("New York Knicks", na=False)
-            & team_text.str.contains("San Antonio Spurs", na=False)
-            & june_mask
-        )
-
-        finals_mask = finals_mask | matchup_mask
-
-    temp = temp[finals_mask].copy()
-
-    if temp.empty:
-        return temp
-
-    if "台灣開賽時間" in temp.columns:
+    date_col = "台灣日期" if "台灣日期" in temp.columns else "台灣開賽時間"
+    if date_col not in temp.columns:
+        return pd.DataFrame()
+    dates = pd.to_datetime(temp[date_col], errors="coerce")
+    season_year = stable_season_year(TODAY_TW)
+    in_final_month = (dates.dt.year == season_year) & (dates.dt.month == 6)
+    marked_finals = temp["series_info"].fillna("").astype(str).str.contains("NBA Finals", case=False, regex=False)
+    temp = temp.loc[in_final_month & marked_finals].copy()
+    if "台灣開賽時間" in temp.columns and not temp.empty:
         temp["_sort"] = pd.to_datetime(temp["台灣開賽時間"], errors="coerce")
-        temp = temp.sort_values("_sort").drop(columns=["_sort"], errors="ignore")
-
+        temp = temp.sort_values("_sort").drop(columns=["_sort"])
     return temp
 
 
@@ -2620,17 +2621,22 @@ def stable_filter_finals(df):
     if "series_info" not in df.columns:
         return pd.DataFrame()
 
-    return df[
-        df["series_info"]
-        .fillna("")
-        .astype(str)
-        .str.contains("NBA Finals", case=False, na=False)
+    current = stable_filter_current_season(df)
+    if current.empty:
+        return current
+    return current[
+        current["series_info"].fillna("").astype(str).str.contains("NBA Finals", case=False, na=False)
     ].copy()
 
 
 def build_data_health_html():
     log = load_prediction_log()
     cache = load_espn_day_cache()
+    # 年度封存的資料狀態只統計該賽季，完整 CSV 仍另外保存。
+    if log is not None and not log.empty and "預測目標日期" in log.columns:
+        log = log[log["預測目標日期"].apply(stable_season_year).eq(stable_season_year(TODAY_TW))].copy()
+    if cache is not None and not cache.empty and "台灣日期" in cache.columns:
+        cache = cache[cache["台灣日期"].apply(stable_season_year).eq(stable_season_year(TODAY_TW))].copy()
     finals_games = stable_get_finals_games()
 
     rows = []
@@ -3030,11 +3036,11 @@ def stable_filter_no_recommend_finals(df):
     if df is None or df.empty or "series_info" not in df.columns:
         return pd.DataFrame()
 
-    return df[
-        df["series_info"]
-        .fillna("")
-        .astype(str)
-        .str.contains("NBA Finals", case=False, na=False)
+    current = stable_filter_current_season(df)
+    if current.empty:
+        return current
+    return current[
+        current["series_info"].fillna("").astype(str).str.contains("NBA Finals", case=False, na=False)
     ].copy()
 
 
@@ -3091,8 +3097,9 @@ def build_season_dashboard_html(win_rates):
     season_avoid_rate = stable_avoid_rate_text(season_no_rows)
     finals_avoid_rate = stable_avoid_rate_text(finals_no_rows)
 
-    stable_upsert_season_summary({
-        "賽季年份": season_year,
+    if int(champion.get("champion_wins", 0) or 0) >= 4:
+        stable_upsert_season_summary({
+            "賽季年份": season_year,
         "賽季": season_label,
         "總冠軍": champion.get("champion", "—"),
         "總冠軍賽": champion.get("series_text", "—"),
@@ -3773,6 +3780,86 @@ def build_top3_cards(df, type_name):
         """)
     return "\n".join(cards)
 
+def nba_archive_detail_fragment(page):
+    """擷取封存 HTML 的外層 season-details-body div，保留內部完整內容。"""
+    import re
+    pattern = re.compile(r"</?div\b[^>]*>", re.IGNORECASE)
+    anchor = re.search(r'<div\s+class=["\']season-details-body["\']\s*>', page, re.IGNORECASE)
+    if not anchor:
+        return ""
+    depth = 0
+    for token in pattern.finditer(page, anchor.start()):
+        if token.group().lower().startswith("</div"):
+            depth -= 1
+            if depth == 0:
+                return page[anchor.start():token.end()]
+        else:
+            depth += 1
+    return ""
+
+
+def nba_completed_seasons_html():
+    """只列已完成的年度封存，最多 10 年，並嵌入已凍結的年度細節。"""
+    from html import escape
+    file = DATA_DIR / "season_summary.csv"
+    if not file.exists():
+        return ""
+    try:
+        df = pd.read_csv(file)
+    except Exception as error:
+        print("歷年封存讀取失敗：", error)
+        return ""
+    if df.empty or "賽季年份" not in df.columns:
+        return ""
+    df["_year"] = pd.to_numeric(df["賽季年份"], errors="coerce")
+    df = df.dropna(subset=["_year"]).sort_values("_year", ascending=False)
+    df = df.drop_duplicates("_year").head(10)
+
+    blocks = []
+    for _, row in df.iterrows():
+        year = int(row["_year"])
+        if year > stable_season_year(TODAY_TW):
+            continue
+        champion = str(row.get("總冠軍", "")).strip()
+        if not champion or champion in ("—", "尚未產生", "nan"):
+            continue
+        def text(name):
+            value = row.get(name, "—")
+            return escape(str(value) if pd.notna(value) else "—")
+        archive_file = REPORT_DIR / "archives" / f"{year}.html"
+        details = "<div class='season-details-body'><p class='empty'>本賽季詳細紀錄尚未封存；年度勝率已保留。</p></div>"
+        if archive_file.exists():
+            raw_detail = archive_file.read_text(encoding="utf-8")
+            extracted = nba_archive_detail_fragment(raw_detail)
+            if extracted:
+                details = extracted
+        blocks.append(f"""
+        <details class="season-details">
+          <summary>▶ {year} 賽季｜總冠軍：{text('總冠軍')}｜
+          總冠軍賽：{text('總冠軍賽')}｜Top3：{text('Top3勝率')}｜
+          總勝率：{text('年度總勝率')}</summary>
+          {details}
+        </details>""")
+    return "\n".join(blocks)
+
+
+def nba_has_completed_current_season():
+    year = stable_season_year(TODAY_TW)
+    if TODAY_TW.month in (7, 8, 9):
+        return True
+    path = DATA_DIR / "season_summary.csv"
+    if not path.exists():
+        return False
+    try:
+        data = pd.read_csv(path)
+    except Exception:
+        return False
+    if data.empty or "賽季年份" not in data.columns or "總冠軍" not in data.columns:
+        return False
+    match = data[pd.to_numeric(data["賽季年份"], errors="coerce").eq(year)]
+    return any(str(x).strip() not in ("", "—", "尚未產生", "nan") for x in match["總冠軍"])
+
+
 def generate_html_report(predictions, yesterday_verify, win_rates):
     summary_text = build_summary_text(win_rates)
     season_dashboard_html = build_season_dashboard_html(win_rates)
@@ -3784,6 +3871,10 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
 
     if PREDICTION_LOG_CSV.exists():
         history_df = load_prediction_log()
+        if not history_df.empty and "預測目標日期" in history_df.columns:
+            history_df = history_df[
+                history_df["預測目標日期"].apply(stable_season_year).eq(stable_season_year(TODAY_TW))
+            ].copy()
 
         if len(history_df) > 0:
             # 只保留一般歷史推薦：主推 / 副推
@@ -4010,6 +4101,10 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
 
     if PREDICTION_LOG_CSV.exists():
         pass_df = load_prediction_log()
+        if not pass_df.empty and "預測目標日期" in pass_df.columns:
+            pass_df = pass_df[
+                pass_df["預測目標日期"].apply(stable_season_year).eq(stable_season_year(TODAY_TW))
+            ].copy()
 
         if not pass_df.empty:
             if "推薦狀態" not in pass_df.columns:
@@ -4257,22 +4352,45 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
 
     has_tomorrow_games = predictions is not None and not predictions.empty
     has_yesterday_verify = yesterday_verify is not None and not yesterday_verify.empty
-    show_live_summary = has_tomorrow_games or has_yesterday_verify
-    summary_section_html = summary_text if show_live_summary else ""
+    is_completed = nba_has_completed_current_season()
+    is_offseason = TODAY_TW.month in (7, 8, 9) or is_completed
+    is_live_season = not is_offseason
+
+    current_verified = stable_filter_current_season(stable_build_verified_rows(include_no_recommend=False))
+    current_pass = stable_filter_current_season(stable_build_no_recommend_rows())
+    current_main = pd.DataFrame()
+    if current_verified is not None and not current_verified.empty:
+        current_main = current_verified[
+            current_verified["推薦等級"].astype(str).str.contains("主推", na=False)
+        ].copy()
+
+    if is_live_season:
+        main_display = stable_rate_text(current_main) if not current_main.empty else "尚無已驗證紀錄"
+        top3_display = stable_rate_text(current_verified) if not current_verified.empty else "尚無已驗證紀錄"
+        avoid_display = stable_avoid_rate_text(current_pass) if not current_pass.empty else "尚無已驗證紀錄"
+        summary_section_html = f"""
+        <h2>{stable_season_label(TODAY_TW)} 當季表現</h2>
+        <div class="cards">
+          <div class="card"><div class="label">主推勝率</div><div class="value">{main_display}</div></div>
+          <div class="card"><div class="label">Top3 勝率</div><div class="value">{top3_display}</div></div>
+          <div class="card"><div class="label">當季總勝率</div><div class="value">{top3_display}</div></div>
+          <div class="card"><div class="label">不推薦避開率</div><div class="value">{avoid_display}</div></div>
+        </div>"""
+    else:
+        summary_section_html = ""
 
     if has_tomorrow_games:
-        report_title = "NBA 明日預測報告"
+        report_title = f"NBA {stable_season_label(TODAY_TW)} 預測報告"
         report_subtitle = f"產生時間：{tw_now_text()}｜預測日期：{TOMORROW_TW}"
         tomorrow_section_html = f"""
     <h2>明日推薦</h2>
-
-    <div class="final-wrap">
-        {final_recommendations_html(predictions)}
-    </div>
+    <div class="final-wrap">{final_recommendations_html(predictions)}</div>
 """
     else:
-        report_title = f"NBA {stable_season_label(TODAY_TW)} 結算報告"
-        report_subtitle = f"產生時間：{tw_now_text()}｜賽季結算 / 休賽期封存"
+        report_title = (f"NBA {stable_season_label(TODAY_TW)} 預測報告"
+                        if is_live_season else "NBA 休賽期報告")
+        report_subtitle = (f"產生時間：{tw_now_text()}｜明日沒有比賽或尚無推薦"
+                           if is_live_season else f"產生時間：{tw_now_text()}｜賽季封存 / 休賽期")
         tomorrow_section_html = ""
 
     if has_yesterday_verify:
@@ -4288,51 +4406,30 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
         yesterday_section_html = ""
 
     champion_info = stable_get_champion_info()
-    season_compact_html = f"""
-    <details class="season-details">
-        <summary>
-            ▶ {stable_season_label(TODAY_TW)}｜
-            總冠軍：{champion_info.get('champion', '—')}｜
-            總冠軍賽：{champion_info.get('series_text', '—')}｜
-            Top3：{win_rates.get('top3_30', '0/0（0.0%）')}｜
-            總勝率：{win_rates.get('season_current', '0/0（0.0%）')}
-        </summary>
+    if int(champion_info.get("champion_wins", 0) or 0) >= 4:
+        # 下一季決出冠軍後才產生獨立詳細封存；2026 由安裝程序預先凍結。
+        archive_file = REPORT_DIR / "archives" / f"{stable_season_year(TODAY_TW)}.html"
+        if not archive_file.exists():
+            archive_file.parent.mkdir(parents=True, exist_ok=True)
+            detail = f"""<div class="season-details-body">
+              <h2>{stable_season_label(TODAY_TW)} 勝率總覽</h2>{season_dashboard_html}
+              <h2>NBA Finals / 總冠軍賽</h2><div class="section">{finals_html}</div>
+              <details class="history-box"><summary>📂 查看歷史推薦紀錄（最近 30 筆）</summary>
+                <div class="section">{history_html}</div></details>
+              <details class="history-box"><summary>🟡 查看不推薦紀錄（最近 30 筆，不列入勝率）</summary>
+                <div class="section">{pass_history_html}</div></details>
+              <h2>資料狀態 / 缺漏檢查</h2><div class="section">{health_html}</div>
+              </div>"""
+            archive_file.write_text(detail, encoding="utf-8")
 
-        <div class="season-details-body">
-            <h2>{stable_season_label(TODAY_TW)} 勝率總覽</h2>
-            {season_dashboard_html}
-
-            <h2>NBA Finals / 總冠軍賽</h2>
-            <div class="section">
-                {finals_html}
-            </div>
-            <details class="history-box">
-                <summary>📂 查看歷史推薦紀錄（最近 30 筆）</summary>
-                <div class="section" style="margin-top:14px;">
-                    {history_html}
-                </div>
-            </details>
-
-            <details class="history-box">
-                <summary>🟡 查看不推薦紀錄（最近 30 筆，不列入勝率）</summary>
-                <div class="section" style="margin-top:14px;">
-                    {pass_history_html}
-                </div>
-            </details>
-
-            <h2>資料狀態 / 缺漏檢查</h2>
-            <div class="section">
-                {health_html}
-            </div>
-        </div>
-    </details>
-"""
+    season_compact_html = nba_completed_seasons_html()
 
     html = f"""
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{report_title}</title>
 <style>
 body {{
@@ -4739,7 +4836,7 @@ h1 {{
 }}
 
 .subtitle::after {{
-    content: "｜目前狀態：2026 賽季已封存";
+    content: "";
     color: #ffb164;
     font-weight: 800;
 }}
