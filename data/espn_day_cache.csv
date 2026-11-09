@@ -450,13 +450,6 @@
 401914127,2026-10-05 07:00,2026-10-05,Utah Jazz,Denver Nuggets,UTAH,DEN,109,97,True,Final,,,,🔴 FINAL,
 401918010,2026-10-05 07:00,2026-10-05,Golden State Warriors,LA Clippers,GS,LAC,101,104,True,Final,,,,🔴 FINAL,
 401902644,2026-10-04 07:00,2026-10-04,Miami Heat,Toronto Raptors,MIA,TOR,129,105,True,Final,,,,🔴 FINAL,NBA Canada Games 2026
-401909938,2026-11-08 06:00,2026-11-08,Denver Nuggets,Indiana Pacers,DEN,IND,114,102,True,Final,,,,🔴 FINAL,NBA Mexico City Game
-401909939,2026-11-08 08:30,2026-11-08,Brooklyn Nets,Atlanta Hawks,BKN,ATL,121,124,True,Final,,,,🔴 FINAL,
-401909940,2026-11-08 09:00,2026-11-08,New York Knicks,Cleveland Cavaliers,NY,CLE,109,97,True,Final,,,,🔴 FINAL,
-401909941,2026-11-08 09:00,2026-11-08,Washington Wizards,Oklahoma City Thunder,WSH,OKC,75,114,True,Final,,,,🔴 FINAL,
-401909942,2026-11-08 09:30,2026-11-08,Orlando Magic,Golden State Warriors,ORL,GS,119,126,True,Final,,,,🔴 FINAL,
-401909943,2026-11-08 10:00,2026-11-08,Houston Rockets,Phoenix Suns,HOU,PHX,99,102,True,Final,,,,🔴 FINAL,
-401909944,2026-11-08 11:00,2026-11-08,San Antonio Spurs,Portland Trail Blazers,SA,POR,125,103,True,Final,,,,🔴 FINAL,
 401909287,2026-11-07 08:00,2026-11-07,Washington Wizards,Atlanta Hawks,WSH,ATL,132,139,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909288,2026-11-07 08:00,2026-11-07,Boston Celtics,Charlotte Hornets,BOS,CHA,119,80,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909289,2026-11-07 08:30,2026-11-07,Philadelphia 76ers,Cleveland Cavaliers,PHI,CLE,95,119,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
@@ -466,13 +459,6 @@
 401909293,2026-11-07 09:00,2026-11-07,Minnesota Timberwolves,New Orleans Pelicans,MIN,NO,115,109,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909294,2026-11-07 11:00,2026-11-07,Portland Trail Blazers,Los Angeles Lakers,POR,LAL,118,124,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909295,2026-11-07 11:00,2026-11-07,San Antonio Spurs,Sacramento Kings,SA,SAC,124,109,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909945,2026-11-09 04:30,2026-11-09,Philadelphia 76ers,Chicago Bulls,PHI,CHI,127,121,True,Final,,,,🔴 FINAL,
-401909946,2026-11-09 07:00,2026-11-09,Los Angeles Lakers,Detroit Pistons,LAL,DET,121,116,True,Final,,,,🔴 FINAL,
-401909947,2026-11-09 08:00,2026-11-09,Utah Jazz,Minnesota Timberwolves,UTAH,MIN,100,115,True,Final,,,,🔴 FINAL,
-401909948,2026-11-09 08:30,2026-11-09,Brooklyn Nets,Dallas Mavericks,BKN,DAL,86,111,False,In Progress,,,,🟢 LIVE,
-401909949,2026-11-09 09:00,2026-11-09,Boston Celtics,Milwaukee Bucks,BOS,MIL,103,81,False,In Progress,,,,🟢 LIVE,
-401909950,2026-11-09 10:00,2026-11-09,New Orleans Pelicans,LA Clippers,NO,LAC,34,40,False,In Progress,,,,🟢 LIVE,
-401909951,2026-11-09 10:00,2026-11-09,Miami Heat,Sacramento Kings,MIA,SAC,47,46,False,In Progress,,,,🟢 LIVE,
 401909952,2026-11-10 08:00,2026-11-10,Los Angeles Lakers,Atlanta Hawks,LAL,ATL,0,0,False,Scheduled,2.5,235.5,LAL -2.5,⏳ Scheduled,
 401909953,2026-11-10 08:00,2026-11-10,Cleveland Cavaliers,Charlotte Hornets,CLE,CHA,0,0,False,Scheduled,8.5,214.5,CLE -8.5,⏳ Scheduled,
 401909954,2026-11-10 08:00,2026-11-10,Washington Wizards,Detroit Pistons,WSH,DET,0,0,False,Scheduled,-10.5,218.5,DET -10.5,⏳ Scheduled,
@@ -481,6 +467,12 @@
 401909957,2026-11-10 09:30,2026-11-10,Denver Nuggets,Houston Rockets,DEN,HOU,0,0,False,Scheduled,-8.5,217.5,HOU -8.5,⏳ Scheduled,
 401909958,2026-11-10 10:00,2026-11-10,San Antonio Spurs,Phoenix Suns,SA,PHX,0,0,False,Scheduled,8.5,228.5,SA -8.5,⏳ Scheduled,
 401909959,2026-11-10 11:00,2026-11-10,New Orleans Pelicans,Golden State Warriors,NO,GS,0,0,False,Scheduled,-8.5,231.5,GS -8.5,⏳ Scheduled,
+401909960,2026-11-11 08:30,2026-11-11,Milwaukee Bucks,New York Knicks,MIL,NY,0,0,False,Scheduled,,,,⏳ Scheduled,
+401909961,2026-11-11 09:00,2026-11-11,Boston Celtics,Philadelphia 76ers,BOS,PHI,0,0,False,Scheduled,1.5,215.5,BOS -1.5,⏳ Scheduled,
+401909962,2026-11-11 10:00,2026-11-11,LA Clippers,Phoenix Suns,LAC,PHX,0,0,False,Scheduled,,,,⏳ Scheduled,
+401909963,2026-11-11 10:00,2026-11-11,Miami Heat,Utah Jazz,MIA,UTAH,0,0,False,Scheduled,,,,⏳ Scheduled,
+401909964,2026-11-11 11:00,2026-11-11,Orlando Magic,Sacramento Kings,ORL,SAC,0,0,False,Scheduled,,,,⏳ Scheduled,
+401909965,2026-11-11 12:00,2026-11-11,Oklahoma City Thunder,Portland Trail Blazers,OKC,POR,0,0,False,Scheduled,,,,⏳ Scheduled,
 401909945,2026-11-09 04:30,2026-11-09,Philadelphia 76ers,Chicago Bulls,PHI,CHI,127,121,True,Final,,,,🔴 FINAL,
 401909946,2026-11-09 07:00,2026-11-09,Los Angeles Lakers,Detroit Pistons,LAL,DET,121,116,True,Final,,,,🔴 FINAL,
 401909947,2026-11-09 08:00,2026-11-09,Utah Jazz,Minnesota Timberwolves,UTAH,MIN,100,115,True,Final,,,,🔴 FINAL,
@@ -488,3 +480,18 @@
 401909949,2026-11-09 09:00,2026-11-09,Boston Celtics,Milwaukee Bucks,BOS,MIL,117,97,True,Final,,,,🔴 FINAL,
 401909950,2026-11-09 10:00,2026-11-09,New Orleans Pelicans,LA Clippers,NO,LAC,123,139,True,Final,,,,🔴 FINAL,
 401909951,2026-11-09 10:00,2026-11-09,Miami Heat,Sacramento Kings,MIA,SAC,114,108,True,Final,,,,🔴 FINAL,
+401909938,2026-11-08 06:00,2026-11-08,Denver Nuggets,Indiana Pacers,DEN,IND,114,102,True,Final,,,,🔴 FINAL,NBA Mexico City Game
+401909939,2026-11-08 08:30,2026-11-08,Brooklyn Nets,Atlanta Hawks,BKN,ATL,121,124,True,Final,,,,🔴 FINAL,
+401909940,2026-11-08 09:00,2026-11-08,New York Knicks,Cleveland Cavaliers,NY,CLE,109,97,True,Final,,,,🔴 FINAL,
+401909941,2026-11-08 09:00,2026-11-08,Washington Wizards,Oklahoma City Thunder,WSH,OKC,75,114,True,Final,,,,🔴 FINAL,
+401909942,2026-11-08 09:30,2026-11-08,Orlando Magic,Golden State Warriors,ORL,GS,119,126,True,Final,,,,🔴 FINAL,
+401909943,2026-11-08 10:00,2026-11-08,Houston Rockets,Phoenix Suns,HOU,PHX,99,102,True,Final,,,,🔴 FINAL,
+401909944,2026-11-08 11:00,2026-11-08,San Antonio Spurs,Portland Trail Blazers,SA,POR,125,103,True,Final,,,,🔴 FINAL,
+401909952,2026-11-10 08:00,2026-11-10,Los Angeles Lakers,Atlanta Hawks,LAL,ATL,0,0,False,Scheduled,-1.5,237.5,ATL -1.5,⏳ Scheduled,
+401909953,2026-11-10 08:00,2026-11-10,Cleveland Cavaliers,Charlotte Hornets,CLE,CHA,0,0,False,Scheduled,8.5,214.5,CLE -8.5,⏳ Scheduled,
+401909954,2026-11-10 08:00,2026-11-10,Washington Wizards,Detroit Pistons,WSH,DET,0,0,False,Scheduled,-10.5,217.5,DET -10.5,⏳ Scheduled,
+401909955,2026-11-10 08:30,2026-11-10,Memphis Grizzlies,Toronto Raptors,MEM,TOR,0,0,False,Scheduled,-3.5,229.5,TOR -3.5,⏳ Scheduled,
+401909956,2026-11-10 09:00,2026-11-10,Indiana Pacers,Dallas Mavericks,IND,DAL,0,0,False,Scheduled,-3.5,226.5,DAL -3.5,⏳ Scheduled,
+401909957,2026-11-10 09:30,2026-11-10,Denver Nuggets,Houston Rockets,DEN,HOU,0,0,False,Scheduled,-9.5,219.5,HOU -9.5,⏳ Scheduled,
+401909958,2026-11-10 10:00,2026-11-10,San Antonio Spurs,Phoenix Suns,SA,PHX,0,0,False,Scheduled,8.5,227.5,SA -8.5,⏳ Scheduled,
+401909959,2026-11-10 11:00,2026-11-10,New Orleans Pelicans,Golden State Warriors,NO,GS,0,0,False,Scheduled,-9.5,232.5,GS -9.5,⏳ Scheduled,
