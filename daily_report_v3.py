@@ -110,6 +110,7 @@ TEAM_SHORT_NAME = {
     "New Orleans Pelicans": "鵜鶘",
     "Oklahoma City Thunder": "雷霆",
     "Minnesota Timberwolves": "灰狼",
+    "Memphis Grizzlies": "灰熊",
     "Brooklyn Nets": "籃網",
     "Los Angeles Clippers": "快艇",
 }
@@ -599,10 +600,14 @@ def fetch_espn_games_by_taiwan_date(target_tw_date):
             # 今天 / 昨天可能還在更新比分
             # 不要直接使用舊 cache
             if target_tw_date not in [TODAY_TW, YESTERDAY_TW, TOMORROW_TW, TODAY_TW - timedelta(days=2)]:
-
-                ESPN_DAY_CACHE[cache_key] = cached_rows.copy()
-
-                return cached_rows
+                # 過去的賽程如果當時尚未完賽，不能永久沿用那份舊快取。
+                complete = (
+                    cached_rows["completed"].fillna(False).astype(str).str.lower().isin(("true", "1", "yes")).all()
+                    if "completed" in cached_rows.columns else False
+                )
+                if complete:
+                    ESPN_DAY_CACHE[cache_key] = cached_rows.copy()
+                    return cached_rows
 
     all_games = []
     check_dates = [
@@ -1593,8 +1598,15 @@ def predict_game(row):
 
 def build_tomorrow_predictions():
     games = fetch_espn_games_by_taiwan_date(TOMORROW_TW)
-    if games.empty:
-        return games
+    if games is None or games.empty:
+        return pd.DataFrame() if games is None else games
+
+    # 午夜後的「今日賽程」只計算尚未開賽的場次，絕不事後產生預測。
+    if TOMORROW_TW == TODAY_TW:
+        now_text = datetime.now(TAIWAN_TZ).strftime("%Y-%m-%d %H:%M")
+        games = games[games["台灣開賽時間"].astype(str) > now_text].copy()
+        if games.empty:
+            return games
 
     games = merge_lines(games)
     get_recent_games_cache(TODAY_TW)  # 先更新再計算固定強度以外的動態調整
@@ -1669,6 +1681,14 @@ def save_prediction_log(new_predictions):
 
 
         return
+
+    # 每個目標日期最多儲存一次 Top3；隔天午夜後保留前一天的賽前紀錄。
+    previous = load_prediction_log()
+    if not previous.empty and "預測目標日期" in previous.columns:
+        saved = previous[previous["預測目標日期"].astype(str).eq(str(TOMORROW_TW))]
+        if not saved.empty:
+            print(f"{TOMORROW_TW} 原始賽前預測已存 {len(saved)} 筆，保留、不重排、不覆蓋")
+            return
 
     final_recs = build_final_recommendations(new_predictions)
 
@@ -3483,7 +3503,7 @@ def build_final_recommendations(predictions):
         return []
 
     RECOMMEND_MIN_SCORE = 70
-    MIN_EDGE_TO_ENTER_CANDIDATE = 2.5
+    MIN_EDGE_TO_ENTER_CANDIDATE = 0.0  # 所有有盤口候選均參與信心排名
 
     items = []
 
@@ -3859,6 +3879,180 @@ def nba_has_completed_current_season():
     match = data[pd.to_numeric(data["賽季年份"], errors="coerce").eq(year)]
     return any(str(x).strip() not in ("", "—", "尚未產生", "nan") for x in match["總冠軍"])
 
+
+
+# NBA_2027_LIVE_VISIBILITY_FIX_20261111
+
+def nba_current_season_sections(avoid_rate="尚無可驗證紀錄"):
+    """以已儲存預測與實際比分，展示當季最近驗證與兩類歷史。
+
+    不改寫 prediction_log，不重算預測，也不把舊預測標示成明日推薦。
+    過／沒過及避開率沿用 stable_calc_pick_result 的原本規則。
+    """
+    from html import escape
+
+    log = load_prediction_log()
+    if log is None or log.empty or "預測目標日期" not in log.columns:
+        return ("<h2>最近驗證結果</h2><div class='section'><p class='empty'>本季尚未存有預測紀錄。</p></div>",
+                "<details class='history-box' id='season-history'><summary>📂 本季推薦／不推薦紀錄（尚無資料）</summary><div class='section'><p class='empty'>目前沒有紀錄。</p></div></details>")
+
+    current_year = stable_season_year(TODAY_TW)
+    log = log[log["預測目標日期"].apply(stable_season_year).eq(current_year)].copy()
+    if log.empty:
+        return ("<h2>最近驗證結果</h2><div class='section'><p class='empty'>本季尚無可驗證的紀錄。</p></div>",
+                "<details class='history-box' id='season-history'><summary>📂 本季推薦／不推薦紀錄（尚無資料）</summary><div class='section'><p class='empty'>目前沒有紀錄。</p></div></details>")
+
+    log["_date"] = pd.to_datetime(log["預測目標日期"], errors="coerce").dt.date
+    log = log[log["_date"].notna()].copy()
+    if log.empty:
+        return ("<h2>最近驗證結果</h2><div class='section'><p class='empty'>預測紀錄日期無法解析。</p></div>", "")
+
+    # 最近日期在前；同一日期照原本 CSV 順序排列，最多保存十年的歷史交給年度封存。
+    log = log.sort_values("_date", ascending=False, kind="stable")
+    no_rec = log.get("推薦狀態", pd.Series("推薦", index=log.index)).fillna("推薦").astype(str).eq("不推薦")
+    if "推薦等級" in log.columns:
+        no_rec = no_rec | log["推薦等級"].fillna("").astype(str).str.upper().eq("PASS")
+    if "推薦類型" in log.columns:
+        no_rec = no_rec | log["推薦類型"].fillna("").astype(str).eq("觀望")
+    # 兩種紀錄各取最近 30 筆，避免多年累積後逐一抓取大量歷史日期。
+    display_log = pd.concat([log.loc[~no_rec].head(30), log.loc[no_rec].head(30)])
+    display_log = display_log.sort_values("_date", ascending=False, kind="stable")
+    game_results = {}
+    for day in display_log["_date"].unique():
+        if day > TODAY_TW:
+            continue
+        try:
+            games = fetch_espn_games_by_taiwan_date(day)
+            if games is None or games.empty or "game_id" not in games.columns:
+                continue
+            for _, g in games.iterrows():
+                game_results[(day, str(g.get("game_id", "")))] = g
+        except Exception as error:
+            print("當季紀錄驗證暫時失敗：", day, error)
+
+    records = []
+    for _, row in display_log.iterrows():
+        day = row["_date"]
+        gid = str(row.get("game_id", ""))
+        game = game_results.get((day, gid))
+        status = str(row.get("推薦狀態", "推薦")).strip()
+        is_avoid = (status == "不推薦" or str(row.get("推薦等級", "")).upper() == "PASS"
+                    or str(row.get("推薦類型", "")) == "觀望")
+        level = normalize_rec_level(row.get("推薦等級", ""))
+        result = "待開賽／驗證" if day >= TODAY_TW else "尚未取得賽果"
+        score = "—"
+        if game is not None:
+            away = safe_float(game.get("away_score"), None)
+            home = safe_float(game.get("home_score"), None)
+            # ESPN cache 有時將布林值讀成字串；不能把 'False' 當成已完賽。
+            completed = str(game.get("completed", False)).strip().lower() in ("true", "1", "yes")
+            if completed:
+                if away is not None and home is not None:
+                    score = f"{safe_int(away)}-{safe_int(home)}"
+                merged = row.to_dict()
+                merged.update({"completed": True, "away_score": away, "home_score": home})
+                result = stable_calc_pick_result(merged, allow_original_pick=is_avoid)
+            else:
+                result = "未完賽"
+        verified = result in ("過", "沒過", "走水")
+        if is_avoid:
+            # 未推薦的原候選不是反向推薦；只回報該候選的賽後結果。
+            display_result = {"沒過": "✅ 原候選沒過", "過": "❌ 原候選過", "走水": "➖ 走水"}.get(result, result)
+        else:
+            display_result = {"過": "✅ 過", "沒過": "❌ 沒過", "走水": "➖ 走水"}.get(result, result)
+
+        type_text, pick = stable_parse_original_pick(row.get("推薦類型", ""), row.get("推薦內容", ""))
+        if not pick or pick.lower() == "nan":
+            pick = "—"
+        records.append({
+            "日期": str(day),
+            "隊伍": f"{short_name(row.get('客隊', ''))} vs {short_name(row.get('主隊', ''))}",
+            "比分": score,
+            "等級": level if level in ("主推", "副推 1", "副推 2") else "—",
+            "類型": type_text,
+            "預測": pick_short_name(pick),
+            "信心": str(row.get("信心分數", "—")),
+            "狀態": "不推薦" if is_avoid else "推薦",
+            "結果": display_result,
+            "_verified": verified,
+            "_avoid": is_avoid,
+        })
+
+    def table(rows, columns=None):
+        if not rows:
+            return "<p class='empty'>目前沒有資料。</p>"
+        default = ["日期", "隊伍", "比分", "等級", "類型", "預測", "信心", "狀態", "結果"]
+        cols = columns if columns is not None else default
+        df = pd.DataFrame(rows)
+        return df[cols].to_html(index=False, escape=True, classes="data-table")
+
+    # 將真正推薦的命中表現、未推薦候選的賽後追蹤徹底分開。
+    # 沿用同一批已儲存的賽前預測及既有 stable_calc_pick_result，不重算預測。
+    recommended = [r for r in records if not r["_avoid"]]
+    avoided = [r for r in records if r["_avoid"]]
+    recommended_verified = [r for r in recommended if r["_verified"]]
+    avoided_verified = [r for r in avoided if r["_verified"]]
+    rec_cols = ["日期", "隊伍", "等級", "預測", "比分", "結果"]
+    avoid_cols = ["日期", "隊伍", "等級", "預測", "信心", "比分", "結果"]
+    recent_html = (
+        "<section class='nba-recommended-results'>"
+        "<h2>最近推薦驗證（近 7 筆）</h2>"
+        "<p class='nba-muted-caption'>僅列賽前標記「推薦」且已完賽可驗證的紀錄，不含未推薦候選。</p>"
+        "<div class='section'>" + table(recommended_verified[:7], rec_cols) + "</div></section>"
+        "<section class='nba-avoidance-results'>"
+        "<h2>未推薦候選追蹤（近 7 筆）</h2>"
+        "<p class='nba-muted-caption'>與正式推薦的勝率完全分開。原候選沒過＝避開了該候選；不是賽前推薦相反方向。</p>"
+        "<div class='nba-avoid-meta'>本季原候選沒過比例：" + escape(str(avoid_rate)) + " <small>（只計算已驗證的不推薦候選）</small></div>"
+        "<div class='section'>" + table(avoided_verified[:7], avoid_cols) + "</div></section>"
+    )
+
+    latest_saved = records[0]["日期"] if records else "—"
+    season = escape(stable_season_label(TODAY_TW))
+    history_html = f"""
+    <h2>當季歷史紀錄</h2>
+    <details class='history-box' id='season-history'>
+      <summary>📂 展開 {season} 當季預測紀錄（最新：{escape(latest_saved)}）</summary>
+      <div class='section'>
+        <p class='empty'>以下是當季已儲存的預測，不等於今天或明天的即時推薦。未完賽及缺少賽果的項目會明確標示。</p>
+        <details class='history-box'><summary>✅ 已推薦紀錄（最近 30 筆，共 {len(recommended)} 筆）</summary>
+          <div class='section'>{table(recommended[:30])}</div>
+        </details>
+        <details class='history-box'><summary>🟡 不推薦／PASS 紀錄（最近 30 筆，共 {len(avoided)} 筆）</summary>
+          <div class='section'>{table(avoided[:30])}</div>
+        </details>
+      </div>
+    </details>
+    """
+    return recent_html, history_html
+
+
+def nba_schedule_without_picks_html(predictions):
+    """有賽程但候選沒有達推薦門檻時，展示賽程而不捏造推薦。"""
+    if predictions is None or predictions.empty:
+        return "<div class='section'><p class='empty'>目前尚未取得明日賽程；可能沒有比賽，也可能是資料來源尚未更新。</p></div>"
+    lines_ready = 0
+    rows = []
+    for _, row in predictions.iterrows():
+        spread = safe_float(row.get("home_spread"), None)
+        total = safe_float(row.get("total"), None)
+        if spread is not None or total is not None:
+            lines_ready += 1
+        rows.append({
+            "開賽時間": str(row.get("台灣開賽時間", "")),
+            "對戰": f"{short_name(row.get('客隊', ''))} vs {short_name(row.get('主隊', ''))}",
+            "主隊讓分盤": f"{spread:+.1f}" if spread is not None else "尚無盤口",
+            "大小分盤": f"{total:.1f}" if total is not None else "尚無盤口",
+            "參考預估（非推薦）": (
+                f"主隊分差 {safe_float(row.get('預測主隊分差')):+.1f}／總分 {safe_float(row.get('預測總分')):.1f}"
+                if safe_float(row.get("預測主隊分差")) is not None
+                and safe_float(row.get("預測總分")) is not None else "—"
+            ),
+        })
+    message = ("盤口尚未齊全" if not lines_ready else "盤口資料或預測優勢尚未達推薦門檻")
+    df = pd.DataFrame(rows)
+    return (f"<div class='section'><p class='empty'>已取得 {len(rows)} 場明日賽程，但{message}，暫無可列入 Top3 的推薦。"
+            "稍後更新有可能出現新推薦；不會用舊預測冒充明日預測。</p>"
+            + df.to_html(index=False, escape=True, classes="data-table") + "</div>")
 
 def generate_html_report(predictions, yesterday_verify, win_rates):
     summary_text = build_summary_text(win_rates)
@@ -4369,29 +4563,43 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
         top3_display = stable_rate_text(current_verified) if not current_verified.empty else "尚無已驗證紀錄"
         avoid_display = stable_avoid_rate_text(current_pass) if not current_pass.empty else "尚無已驗證紀錄"
         summary_section_html = f"""
-        <h2>{stable_season_label(TODAY_TW)} 當季表現</h2>
+        <h2>{stable_season_label(TODAY_TW)} 正式推薦表現</h2>
+        <p class="nba-muted-caption">只計入賽前實際標記為「推薦」、且已有賽果的紀錄。未推薦候選不列入勝率。</p>
         <div class="cards">
           <div class="card"><div class="label">主推勝率</div><div class="value">{main_display}</div></div>
-          <div class="card"><div class="label">Top3 勝率</div><div class="value">{top3_display}</div></div>
-          <div class="card"><div class="label">當季總勝率</div><div class="value">{top3_display}</div></div>
-          <div class="card"><div class="label">不推薦避開率</div><div class="value">{avoid_display}</div></div>
-        </div>"""
+          <div class="card"><div class="label">Top3 已推薦勝率</div><div class="value">{top3_display}</div></div>
+        </div>
+        <p class="nba-sample-note">目前樣本數仍有限，勝率僅代表已有紀錄的結果，不代表未來命中率。</p>"""
     else:
         summary_section_html = ""
 
-    if has_tomorrow_games:
+    slate_heading = "今日推薦" if TOMORROW_TW == TODAY_TW else "明日推薦"
+    saved_slate_html = nba_saved_slate_html(TOMORROW_TW) if TOMORROW_TW == TODAY_TW else ""
+
+    if saved_slate_html:
+        report_title = f"NBA {stable_season_label(TODAY_TW)} 預測報告"
+        report_subtitle = f"產生時間：{tw_now_text()}｜今日比賽：{TOMORROW_TW}｜保留原始賽前預測"
+        tomorrow_section_html = f"<h2>今日已儲存的賽前預測</h2>{saved_slate_html}"
+    elif has_tomorrow_games:
         report_title = f"NBA {stable_season_label(TODAY_TW)} 預測報告"
         report_subtitle = f"產生時間：{tw_now_text()}｜預測日期：{TOMORROW_TW}"
-        tomorrow_section_html = f"""
-    <h2>明日推薦</h2>
+        actual_recs = build_final_recommendations(predictions)
+        if actual_recs:
+            tomorrow_section_html = f"""
+    <h2>{slate_heading}</h2>
     <div class="final-wrap">{final_recommendations_html(predictions)}</div>
+"""
+        else:
+            tomorrow_section_html = f"""
+    <h2>{slate_heading}｜目前尚無可用候選</h2>
+    {nba_schedule_without_picks_html(predictions)}
 """
     else:
         report_title = (f"NBA {stable_season_label(TODAY_TW)} 預測報告"
                         if is_live_season else "NBA 休賽期報告")
-        report_subtitle = (f"產生時間：{tw_now_text()}｜明日沒有比賽或尚無推薦"
+        report_subtitle = (f"產生時間：{tw_now_text()}｜明日賽程尚未取得"
                            if is_live_season else f"產生時間：{tw_now_text()}｜賽季封存 / 休賽期")
-        tomorrow_section_html = ""
+        tomorrow_section_html = (f"<h2>{slate_heading}｜賽程尚未取得</h2>" + nba_schedule_without_picks_html(predictions)) if is_live_season else ""
 
     if has_yesterday_verify:
         yesterday_section_html = f"""
@@ -4423,6 +4631,7 @@ def generate_html_report(predictions, yesterday_verify, win_rates):
             archive_file.write_text(detail, encoding="utf-8")
 
     season_compact_html = nba_completed_seasons_html()
+    recent_results_html, live_history_html = nba_current_season_sections(avoid_display) if is_live_season else ("", "")
 
     html = f"""
 <!DOCTYPE html>
@@ -4772,378 +4981,131 @@ h2 {{
 }}
 
 
-/* NBA_DARK_UI_V1_START */
+/* NBA_LIGHT_UI_V2_START */
 :root {{
-    --nba-bg: #06111f;
-    --nba-bg-2: #0b1f36;
-    --nba-panel: rgba(255, 255, 255, 0.94);
-    --nba-panel-soft: rgba(255, 255, 255, 0.08);
-    --nba-border: rgba(77, 141, 230, 0.38);
-    --nba-blue: #1f6feb;
-    --nba-orange: #ff8a1c;
-    --nba-green: #20c56b;
-    --nba-red: #ef5350;
-    --nba-text: #10203a;
-    --nba-muted: #6b7890;
-    --nba-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+  --nba-ink: #14233d; --nba-muted: #64748b; --nba-line: #dce4ee;
+  --nba-bg: #f5f7fb; --nba-accent: #3655d5; --nba-good: #137c67;
+  --nba-danger: #bb3d4a; --nba-shadow: 0 5px 20px rgba(17, 35, 64, .045);
 }}
-
+* {{ box-sizing: border-box; }}
 body {{
-    margin: 0 !important;
-    padding: 0 !important;
-    min-height: 100vh;
-    color: var(--nba-text) !important;
-    background:
-        radial-gradient(circle at 82% 8%, rgba(255, 138, 28, 0.24), transparent 28%),
-        radial-gradient(circle at 12% 18%, rgba(31, 111, 235, 0.34), transparent 34%),
-        linear-gradient(135deg, #04101f 0%, #06172b 44%, #0b2340 100%) !important;
+  margin: 0 !important; padding: 0 !important; min-height: 100vh;
+  color: var(--nba-ink) !important; background: var(--nba-bg) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "Segoe UI", sans-serif !important;
+  line-height: 1.55;
 }}
-
 body::before {{
-    content: "NBA 預測分析系統";
-    display: block;
-    padding: 18px 28px;
-    color: #ffffff;
-    font-size: 19px;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    background: rgba(2, 8, 18, 0.72);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  content: "NBA  /  預測分析"; display: block; color: #fff;
+  background: #111d32; padding: 17px max(24px, calc((100vw - 1130px) / 2));
+  font-size: 17px; font-weight: 850; letter-spacing: .015em;
 }}
-
-.container {{
-    max-width: 1180px !important;
-    margin: 28px auto 42px !important;
-    padding: 0 22px 26px !important;
+.container {{ max-width: 1180px !important; margin: 0 auto !important; padding: 30px 24px 60px !important; }}
+.container > h1 {{
+  font-size: clamp(29px, 3.4vw, 43px) !important; line-height: 1.18;
+  margin: 0 0 10px !important; padding: 0 !important;
+  color: #111d32 !important; letter-spacing: -.04em;
 }}
-
-h1 {{
-    margin: 0 0 8px !important;
-    padding: 34px 36px 4px !important;
-    color: #ffffff !important;
-    font-size: clamp(30px, 4vw, 48px) !important;
-    line-height: 1.12 !important;
-    letter-spacing: -0.04em !important;
-    text-shadow: 0 8px 26px rgba(0, 0, 0, 0.35);
-}}
-
-.subtitle {{
-    margin: 0 0 24px !important;
-    padding: 0 36px 24px !important;
-    color: rgba(255, 255, 255, 0.78) !important;
-    font-size: 15px !important;
-}}
-
-.subtitle::after {{
-    content: "";
-    color: #ffb164;
-    font-weight: 800;
-}}
-
-h2 {{
-    color: #142847 !important;
-    font-size: 21px !important;
-    margin: 24px 0 14px !important;
-    padding: 0 !important;
-}}
-
-.section,
-.final-wrap,
-.season-details-body {{
-    background: rgba(255, 255, 255, 0.94) !important;
-    border: 1px solid rgba(31, 111, 235, 0.14) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 10px 26px rgba(4, 18, 37, 0.08);
-}}
-
-.season-details {{
-    margin: 0 0 22px !important;
-    border: 1px solid rgba(70, 143, 255, 0.82) !important;
-    border-radius: 18px !important;
-    overflow: hidden !important;
-    background: linear-gradient(135deg, rgba(7, 28, 55, 0.98), rgba(8, 43, 82, 0.94)) !important;
-    box-shadow: var(--nba-shadow);
-}}
-
-.season-details > summary {{
-    list-style: none !important;
-    cursor: pointer !important;
-    padding: 18px 22px !important;
-    color: #ffffff !important;
-    font-size: 18px !important;
-    font-weight: 900 !important;
-    line-height: 1.7 !important;
-    background:
-        linear-gradient(90deg, rgba(255, 138, 28, 0.14), transparent 42%),
-        rgba(4, 20, 39, 0.88) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}}
-
-.season-details > summary::-webkit-details-marker {{
-    display: none;
-}}
-
-.season-details > summary::after {{
-    content: "已完成";
-    float: right;
-    margin-top: 2px;
-    padding: 4px 10px;
-    color: #ff9b38;
-    font-size: 13px;
-    font-weight: 900;
-    border: 1px solid rgba(255, 138, 28, 0.55);
-    border-radius: 999px;
-    background: rgba(255, 138, 28, 0.1);
-}}
-
-.season-details-body {{
-    margin: 0 !important;
-    padding: 22px !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-}}
-
-.verify-summary {{
-    margin: 0 0 18px !important;
-    padding: 16px 18px !important;
-    color: #ffffff !important;
-    font-weight: 900 !important;
-    border-radius: 14px !important;
-    border: 1px solid rgba(255, 138, 28, 0.34) !important;
-    background:
-        linear-gradient(135deg, rgba(255, 138, 28, 0.18), rgba(31, 111, 235, 0.2)),
-        #0d2544 !important;
-}}
-
-.cards {{
-    display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    margin: 18px 0 22px !important;
-}}
-
-.card {{
-    margin: 0 !important;
-    padding: 18px !important;
-    border-radius: 15px !important;
-    border: 1px solid rgba(31, 111, 235, 0.16) !important;
-    background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%) !important;
-    box-shadow: 0 8px 22px rgba(10, 28, 55, 0.08) !important;
-}}
-
-.card .label,
-.label {{
-    color: #66758e !important;
-    font-size: 13px !important;
-    font-weight: 800 !important;
-}}
-
-.card .value,
-.value {{
-    color: #0c1f3b !important;
-    font-size: 24px !important;
-    font-weight: 950 !important;
-    letter-spacing: -0.03em !important;
-}}
-
-table.data-table,
-.dataframe.data-table {{
-    width: 100% !important;
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
-    overflow: hidden !important;
-    border: 1px solid #dce5f2 !important;
-    border-radius: 13px !important;
-    background: #ffffff !important;
-}}
-
-table.data-table th,
-.dataframe.data-table th {{
-    padding: 12px 10px !important;
-    color: #263a5c !important;
-    font-size: 13px !important;
-    font-weight: 900 !important;
-    background: #eef4fb !important;
-    border-bottom: 1px solid #d8e2ef !important;
-}}
-
-table.data-table td,
-.dataframe.data-table td {{
-    padding: 11px 10px !important;
-    color: #20314f !important;
-    font-size: 13px !important;
-    border-bottom: 1px solid #edf1f7 !important;
-}}
-
-table.data-table tr:last-child td,
-.dataframe.data-table tr:last-child td {{
-    border-bottom: 0 !important;
-}}
-
-table.data-table tr:nth-child(even) td,
-.dataframe.data-table tr:nth-child(even) td {{
-    background: #fafcff !important;
-}}
-
-.history-box {{
-    margin: 14px 0 !important;
-    border: 1px solid #d9e5f4 !important;
-    border-radius: 14px !important;
-    overflow: hidden !important;
-    background: #ffffff !important;
-    box-shadow: 0 8px 20px rgba(10, 28, 55, 0.06) !important;
-}}
-
-.history-box > summary {{
-    cursor: pointer !important;
-    padding: 16px 18px !important;
-    color: #132846 !important;
-    font-weight: 900 !important;
-    background: linear-gradient(90deg, #f6faff, #ffffff) !important;
-}}
-
-.history-box:nth-of-type(2) > summary {{
-    background: linear-gradient(90deg, #fff8ed, #ffffff) !important;
-}}
-
-.empty {{
-    color: #526078 !important;
-    font-weight: 700 !important;
-}}
-
-p.empty {{
-    padding: 12px 0 !important;
-}}
-
-a {{
-    color: var(--nba-blue) !important;
-}}
-
-.container::after {{
-    content: "本報告資料僅供歷史回顧與研究分析使用，不作為任何投資或投注建議。";
-    display: block;
-    margin: 22px auto 0;
-    padding: 14px 18px;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 13px;
-    text-align: center;
-}}
-
+.subtitle {{ color: #64748b !important; margin: 0 0 30px !important; font-size: 13px !important; padding: 0 !important; }}
+.subtitle::after {{ content: none !important; }}
+.container > h2 {{ color: #14233d !important; font-size: 20px !important; margin: 30px 0 12px !important; letter-spacing: -.015em; }}
+.container h2 {{ color: #14233d !important; }}
+.nba-muted-caption {{ color: #64748b; font-size: 13px; margin: -5px 0 12px; }}
+.nba-sample-note {{ color: #8490a3; font-size: 12px; margin: -10px 0 14px; }}
+.final-wrap {{ display: grid !important; grid-template-columns: repeat(3,minmax(0,1fr)) !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important;
+  gap: 14px !important; padding: 0 !important; margin: 0 0 14px !important; overflow: visible !important; }}
+.final-card {{ background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 15px !important; padding: 21px !important;
+  box-shadow: var(--nba-shadow) !important; min-width: 0; }}
+.final-card.final-main {{ border: 2px solid #8299e2 !important; padding: 20px !important; background: #fff !important;
+  box-shadow: 0 0 0 1px #dce4ff !important; }}
+.final-level {{ color: #5e6f8d !important; font-size: 13px !important; font-weight: 850 !important; }}
+.final-game {{ color: #14233d !important; font-size: 16px !important; margin-top: 15px !important; }}
+.final-pick {{ color: #0e1f3a !important; font-size: clamp(23px,2.2vw,30px) !important;
+  letter-spacing: -.035em; margin: 7px 0 12px !important; overflow-wrap: anywhere; }}
+.final-score, .final-reason {{ color: #627087 !important; font-size: 13px !important; line-height: 1.7 !important;
+  overflow-wrap: anywhere; }}
+.final-reason {{ border-top: 1px solid #edf0f5; padding-top: 10px; }}
+.cards {{ display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  gap: 14px !important; margin: 0 0 18px !important; }}
+.card {{ background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 13px !important; padding: 20px 24px !important;
+  box-shadow: var(--nba-shadow) !important; }}
+.card .label {{ color: #68758c !important; font-size: 13px !important; font-weight: 750 !important; }}
+.card .value {{ color: #14233d !important; font-size: clamp(20px,2.5vw,28px) !important;
+  margin-top: 5px !important; font-weight: 900 !important; overflow-wrap: anywhere; }}
+.section {{ background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 14px !important; box-shadow: var(--nba-shadow) !important;
+  padding: 14px !important; margin: 0 0 18px !important;
+  overflow-x: auto !important; -webkit-overflow-scrolling: touch; }}
+table.data-table, .dataframe.data-table {{ width: 100% !important; border-collapse: collapse !important;
+  border: 0 !important; background: #fff !important; color: var(--nba-ink) !important; }}
+table.data-table th, .dataframe.data-table th {{ color: #586883 !important; font-size: 12px !important;
+  text-align: left; background: #f3f6fb !important; padding: 12px 13px !important;
+  border-bottom: 1px solid var(--nba-line) !important; white-space: nowrap; }}
+table.data-table td, .dataframe.data-table td {{ color: #22314d !important; font-size: 13px !important;
+  padding: 13px 12px !important; vertical-align: top; border-bottom: 1px solid #edf1f6 !important;
+  white-space: nowrap; }}
+table.data-table tr:nth-child(even) td, .dataframe.data-table tr:nth-child(even) td {{ background: #fcfdff !important; }}
+.nba-avoidance-results {{ border-top: 1px solid #dce4ee; margin-top: 32px; padding-top: 5px; }}
+.nba-avoidance-results .section {{ border-color: #e0e7f0 !important; }}
+.nba-avoid-meta {{ display: inline-block; padding: 10px 13px; margin: 0 0 12px; border: 1px solid #dfe6f0;
+  border-radius: 9px; background: #fff; color: #14233d; font-size: 14px; font-weight: 750; }}
+.nba-avoid-meta small {{ color: #64748b; font-weight: 500; font-size: 12px; }}
+.history-box, .season-details {{ background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 13px !important; box-shadow: var(--nba-shadow) !important;
+  margin: 12px 0 16px !important; padding: 0 !important; overflow: hidden !important; }}
+.history-box > summary, .season-details > summary {{ list-style: none !important; cursor: pointer !important;
+  background: #fff !important; color: #152946 !important;
+  padding: 17px 19px !important; font-size: 15px !important; font-weight: 800 !important;
+  line-height: 1.65 !important; overflow-wrap: anywhere; }}
+.history-box summary::-webkit-details-marker, .season-details summary::-webkit-details-marker {{ display:none; }}
+.history-box > summary::before, .season-details > summary::before {{ content: ''; color: var(--nba-accent);
+  font-size: 17px; margin-right: 8px; }}
+.history-box[open] > summary::before, .season-details[open] > summary::before {{ content: ''; }}
+.history-box[open] > summary, .season-details[open] > summary {{ border-bottom:1px solid var(--nba-line); }}
+.season-details > summary::after {{ content: '已完成' !important; color: #697789 !important;
+  border: 1px solid #e0e7ef; background: #f8fafc !important;
+  border-radius: 99px; padding: 3px 9px; font-size: 11px !important;
+  float: right; margin: 1px 0 0 8px; }}
+.season-details-body {{ background: #fff !important; color: var(--nba-ink) !important;
+  border: 0 !important; box-shadow: none !important; padding: 18px !important; }}
+.verify-summary {{ background: #f4f6fa !important; border:1px solid #e1e7f0 !important;
+  color: #1f3150 !important; border-radius: 10px !important; box-shadow: none !important; }}
+.empty, p.empty {{ color: #64748b !important; font-weight: 550 !important; }}
+.result-win {{ color: #137c67 !important; }} .result-loss, .result-lose {{ color: #bb3d4a !important; }}
+.result-push {{ color: #96630b !important; }} .result-pending {{ color: #64748b !important; }}
+a {{ color: var(--nba-accent) !important; }}
+.container::after {{ content: '本報告資料僅供研究分析使用，不作為任何投資或投注建議。';
+  display: block; margin: 28px auto 0; text-align: center; color: #8793a5; font-size: 12px; }}
 @media (max-width: 900px) {{
-    body::before {{
-        padding: 14px 18px;
-        font-size: 16px;
-    }}
-
-    .container {{
-        width: auto !important;
-        margin: 0 !important;
-        padding: 0 12px 24px !important;
-    }}
-
-    h1 {{
-        padding: 26px 8px 6px !important;
-        font-size: 29px !important;
-    }}
-
-    .subtitle {{
-        padding: 0 8px 18px !important;
-        font-size: 13px !important;
-        line-height: 1.7 !important;
-    }}
-
-    .subtitle::after {{
-        display: block;
-        margin-top: 4px;
-    }}
-
-    .season-details {{
-        border-radius: 15px !important;
-    }}
-
-    .season-details > summary {{
-        padding: 14px 14px !important;
-        font-size: 15px !important;
-        line-height: 1.65 !important;
-    }}
-
-    .season-details > summary::after {{
-        float: none;
-        display: inline-block;
-        margin-left: 8px;
-        vertical-align: 1px;
-    }}
-
-    .season-details-body {{
-        padding: 14px !important;
-    }}
-
-    h2 {{
-        font-size: 18px !important;
-        margin: 18px 0 10px !important;
-    }}
-
-    .cards {{
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 10px !important;
-    }}
-
-    .card {{
-        padding: 14px !important;
-    }}
-
-    .card .value,
-    .value {{
-        font-size: 20px !important;
-    }}
-
-    .section,
-    .final-wrap {{
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        border-radius: 14px !important;
-    }}
-
-    table.data-table,
-    .dataframe.data-table {{
-        min-width: 720px !important;
-        font-size: 12px !important;
-    }}
-
-    table.data-table th,
-    table.data-table td,
-    .dataframe.data-table th,
-    .dataframe.data-table td {{
-        white-space: nowrap !important;
-        padding: 9px 8px !important;
-    }}
-
-    .history-box > summary {{
-        padding: 14px !important;
-        font-size: 14px !important;
-    }}
+  .container {{ padding: 23px 15px 44px !important; }}
+  body::before {{ padding: 14px 17px; }}
+  .final-wrap {{ grid-template-columns: 1fr !important; }}
+  .final-card {{ padding: 17px !important; }}
+  .final-card.final-main {{ padding: 16px !important; }}
+  table.data-table, .dataframe.data-table {{ min-width: 640px !important; }}
+  .season-details > summary::after {{ float: none !important; display: inline-block; }}
 }}
-
 @media (max-width: 520px) {{
-    .cards {{
-        grid-template-columns: 1fr !important;
-    }}
-
-    h1 {{
-        font-size: 26px !important;
-    }}
-
-    .season-details > summary {{
-        font-size: 14px !important;
-    }}
-
-    .container::after {{
-        font-size: 12px;
-        line-height: 1.6;
-    }}
+  .cards {{ grid-template-columns: 1fr !important; }}
+  .container > h1 {{ font-size: 29px !important; }}
+  .container > h2 {{ font-size: 18px !important; }}
+  .final-pick {{ font-size: 26px !important; }}
+  table.data-table, .dataframe.data-table {{ min-width: 640px !important; }}
 }}
-/* NBA_DARK_UI_V1_END */
+/* NBA_TOP3_UI_CLEAR_V1 */
+.final-wrap .final-card.final-main {{
+  border: 2px solid #235bcb !important;
+  border-left: 7px solid #235bcb !important;
+  background: #eaf2ff !important;
+  box-shadow: 0 8px 22px rgba(29,78,216,.15) !important;
+}}
+.final-wrap .final-card.final-main .final-level {{
+  color: #164aa6 !important;
+  font-weight: 900 !important;
+}}
+/* NBA_LIGHT_UI_V2_END */
 
 </style>
 </head>
@@ -5155,9 +5117,11 @@ a {{
 
     {tomorrow_section_html}
 
-    {yesterday_section_html}
-
     {summary_section_html}
+
+    {recent_results_html}
+
+    {live_history_html}
 
     {season_compact_html}
 
@@ -5168,13 +5132,75 @@ a {{
 
     REPORT_HTML.write_text(html, encoding="utf-8")
 
+
+# NBA_MIDNIGHT_SLATE_FIX_V1
+
+def nba_choose_prediction_day(now_tw=None, today_games=None):
+    """台灣日期跨過午夜後，當日球賽未全部結束就不要跳到隔天。"""
+    if now_tw is None:
+        now_tw = datetime.now(TAIWAN_TZ)
+    today = now_tw.date()
+    if today_games is None:
+        today_games = fetch_espn_games_by_taiwan_date(today)
+    if today_games is None or today_games.empty:
+        # ESPN 暫時無回應時，優先保留今天已有的賽前紀錄，避免預測消失。
+        log = load_prediction_log()
+        if (log is not None and not log.empty and "預測目標日期" in log.columns
+                and log["預測目標日期"].astype(str).eq(str(today)).any()):
+            return today
+    else:
+        if "completed" not in today_games.columns:
+            return today
+        finished = today_games["completed"].fillna(False).astype(str).str.lower().isin(("true", "1", "yes"))
+        if not finished.all():
+            return today
+    return today + timedelta(days=1)
+
+
+def nba_saved_slate_html(target):
+    """午夜後優先顯示已存的賽前 Top3，不用當下盤口重排。"""
+    from html import escape
+    log = load_prediction_log()
+    if log is None or log.empty or "預測目標日期" not in log.columns:
+        return ""
+    slate = log[log["預測目標日期"].astype(str).eq(str(target))].copy()
+    if slate.empty:
+        return ""
+    slate["_rank"] = slate["推薦等級"].apply(rec_level_order)
+    slate = slate[slate["_rank"].isin((1, 2, 3))].sort_values("_rank")
+    if slate.empty:
+        return ""
+    cards = []
+    for _, r in slate.iterrows():
+        level = normalize_rec_level(r.get("推薦等級", ""))
+        status = str(r.get("推薦狀態", "推薦")).strip() or "推薦"
+        status = "不推薦" if status == "不推薦" else "推薦"
+        team = f"{short_name(r.get('客隊', ''))} vs {short_name(r.get('主隊', ''))}"
+        pick_type, pick = stable_parse_original_pick(r.get("推薦類型", ""), r.get("推薦內容", ""))
+        level_text = final_level_display(level)
+        klass = " final-main" if level == "主推" else ""
+        cards.append(
+            f'<div class="final-card{klass}">'
+            f'<div class="final-level">{escape(level_text)}｜{escape(pick_type)}</div>'
+            f'<div class="final-game">{escape(team)}</div>'
+            f'<div class="final-pick">{escape(pick_short_name(pick))}</div>'
+            f'<div class="final-score">賽前狀態：{escape(status)}｜'
+            f'信心：{escape(str(r.get("信心分數", "—")))}</div>'
+            '</div>'
+        )
+    return ('<p class="nba-muted-caption">本批預測已在賽前儲存；午夜後保留原始內容，'
+            '不會改盤口或事後重排。實際結果請見下方驗證區。</p>'
+            '<div class="final-wrap">' + ''.join(cards) + '</div>')
+
 def main():
+    global TOMORROW_TW
+    TOMORROW_TW = nba_choose_prediction_day()
     total_start = time.time()
 
     print("程式開始執行：daily_report_v3.py")
     print("台灣現在：", tw_now_text())
     print("台灣今天：", TODAY_TW)
-    print("預測明天：", TOMORROW_TW)
+    print("預測目標日期（按當日賽程狀態選擇）：", TOMORROW_TW)
     print("驗證昨天：", YESTERDAY_TW)
 
     # ===== 自動傷兵 =====
