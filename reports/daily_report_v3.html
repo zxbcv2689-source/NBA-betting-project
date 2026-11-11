@@ -346,378 +346,131 @@ h2 {
 }
 
 
-/* NBA_DARK_UI_V1_START */
+/* NBA_LIGHT_UI_V2_START */
 :root {
-    --nba-bg: #06111f;
-    --nba-bg-2: #0b1f36;
-    --nba-panel: rgba(255, 255, 255, 0.94);
-    --nba-panel-soft: rgba(255, 255, 255, 0.08);
-    --nba-border: rgba(77, 141, 230, 0.38);
-    --nba-blue: #1f6feb;
-    --nba-orange: #ff8a1c;
-    --nba-green: #20c56b;
-    --nba-red: #ef5350;
-    --nba-text: #10203a;
-    --nba-muted: #6b7890;
-    --nba-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+  --nba-ink: #14233d; --nba-muted: #64748b; --nba-line: #dce4ee;
+  --nba-bg: #f5f7fb; --nba-accent: #3655d5; --nba-good: #137c67;
+  --nba-danger: #bb3d4a; --nba-shadow: 0 5px 20px rgba(17, 35, 64, .045);
 }
-
+* { box-sizing: border-box; }
 body {
-    margin: 0 !important;
-    padding: 0 !important;
-    min-height: 100vh;
-    color: var(--nba-text) !important;
-    background:
-        radial-gradient(circle at 82% 8%, rgba(255, 138, 28, 0.24), transparent 28%),
-        radial-gradient(circle at 12% 18%, rgba(31, 111, 235, 0.34), transparent 34%),
-        linear-gradient(135deg, #04101f 0%, #06172b 44%, #0b2340 100%) !important;
+  margin: 0 !important; padding: 0 !important; min-height: 100vh;
+  color: var(--nba-ink) !important; background: var(--nba-bg) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "Segoe UI", sans-serif !important;
+  line-height: 1.55;
 }
-
 body::before {
-    content: "NBA 預測分析系統";
-    display: block;
-    padding: 18px 28px;
-    color: #ffffff;
-    font-size: 19px;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    background: rgba(2, 8, 18, 0.72);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  content: "NBA  /  預測分析"; display: block; color: #fff;
+  background: #111d32; padding: 17px max(24px, calc((100vw - 1130px) / 2));
+  font-size: 17px; font-weight: 850; letter-spacing: .015em;
 }
-
-.container {
-    max-width: 1180px !important;
-    margin: 28px auto 42px !important;
-    padding: 0 22px 26px !important;
+.container { max-width: 1180px !important; margin: 0 auto !important; padding: 30px 24px 60px !important; }
+.container > h1 {
+  font-size: clamp(29px, 3.4vw, 43px) !important; line-height: 1.18;
+  margin: 0 0 10px !important; padding: 0 !important;
+  color: #111d32 !important; letter-spacing: -.04em;
 }
-
-h1 {
-    margin: 0 0 8px !important;
-    padding: 34px 36px 4px !important;
-    color: #ffffff !important;
-    font-size: clamp(30px, 4vw, 48px) !important;
-    line-height: 1.12 !important;
-    letter-spacing: -0.04em !important;
-    text-shadow: 0 8px 26px rgba(0, 0, 0, 0.35);
-}
-
-.subtitle {
-    margin: 0 0 24px !important;
-    padding: 0 36px 24px !important;
-    color: rgba(255, 255, 255, 0.78) !important;
-    font-size: 15px !important;
-}
-
-.subtitle::after {
-    content: "";
-    color: #ffb164;
-    font-weight: 800;
-}
-
-h2 {
-    color: #142847 !important;
-    font-size: 21px !important;
-    margin: 24px 0 14px !important;
-    padding: 0 !important;
-}
-
-.section,
-.final-wrap,
-.season-details-body {
-    background: rgba(255, 255, 255, 0.94) !important;
-    border: 1px solid rgba(31, 111, 235, 0.14) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 10px 26px rgba(4, 18, 37, 0.08);
-}
-
-.season-details {
-    margin: 0 0 22px !important;
-    border: 1px solid rgba(70, 143, 255, 0.82) !important;
-    border-radius: 18px !important;
-    overflow: hidden !important;
-    background: linear-gradient(135deg, rgba(7, 28, 55, 0.98), rgba(8, 43, 82, 0.94)) !important;
-    box-shadow: var(--nba-shadow);
-}
-
-.season-details > summary {
-    list-style: none !important;
-    cursor: pointer !important;
-    padding: 18px 22px !important;
-    color: #ffffff !important;
-    font-size: 18px !important;
-    font-weight: 900 !important;
-    line-height: 1.7 !important;
-    background:
-        linear-gradient(90deg, rgba(255, 138, 28, 0.14), transparent 42%),
-        rgba(4, 20, 39, 0.88) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.season-details > summary::-webkit-details-marker {
-    display: none;
-}
-
-.season-details > summary::after {
-    content: "已完成";
-    float: right;
-    margin-top: 2px;
-    padding: 4px 10px;
-    color: #ff9b38;
-    font-size: 13px;
-    font-weight: 900;
-    border: 1px solid rgba(255, 138, 28, 0.55);
-    border-radius: 999px;
-    background: rgba(255, 138, 28, 0.1);
-}
-
-.season-details-body {
-    margin: 0 !important;
-    padding: 22px !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-}
-
-.verify-summary {
-    margin: 0 0 18px !important;
-    padding: 16px 18px !important;
-    color: #ffffff !important;
-    font-weight: 900 !important;
-    border-radius: 14px !important;
-    border: 1px solid rgba(255, 138, 28, 0.34) !important;
-    background:
-        linear-gradient(135deg, rgba(255, 138, 28, 0.18), rgba(31, 111, 235, 0.2)),
-        #0d2544 !important;
-}
-
-.cards {
-    display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    margin: 18px 0 22px !important;
-}
-
-.card {
-    margin: 0 !important;
-    padding: 18px !important;
-    border-radius: 15px !important;
-    border: 1px solid rgba(31, 111, 235, 0.16) !important;
-    background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%) !important;
-    box-shadow: 0 8px 22px rgba(10, 28, 55, 0.08) !important;
-}
-
-.card .label,
-.label {
-    color: #66758e !important;
-    font-size: 13px !important;
-    font-weight: 800 !important;
-}
-
-.card .value,
-.value {
-    color: #0c1f3b !important;
-    font-size: 24px !important;
-    font-weight: 950 !important;
-    letter-spacing: -0.03em !important;
-}
-
-table.data-table,
-.dataframe.data-table {
-    width: 100% !important;
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
-    overflow: hidden !important;
-    border: 1px solid #dce5f2 !important;
-    border-radius: 13px !important;
-    background: #ffffff !important;
-}
-
-table.data-table th,
-.dataframe.data-table th {
-    padding: 12px 10px !important;
-    color: #263a5c !important;
-    font-size: 13px !important;
-    font-weight: 900 !important;
-    background: #eef4fb !important;
-    border-bottom: 1px solid #d8e2ef !important;
-}
-
-table.data-table td,
-.dataframe.data-table td {
-    padding: 11px 10px !important;
-    color: #20314f !important;
-    font-size: 13px !important;
-    border-bottom: 1px solid #edf1f7 !important;
-}
-
-table.data-table tr:last-child td,
-.dataframe.data-table tr:last-child td {
-    border-bottom: 0 !important;
-}
-
-table.data-table tr:nth-child(even) td,
-.dataframe.data-table tr:nth-child(even) td {
-    background: #fafcff !important;
-}
-
-.history-box {
-    margin: 14px 0 !important;
-    border: 1px solid #d9e5f4 !important;
-    border-radius: 14px !important;
-    overflow: hidden !important;
-    background: #ffffff !important;
-    box-shadow: 0 8px 20px rgba(10, 28, 55, 0.06) !important;
-}
-
-.history-box > summary {
-    cursor: pointer !important;
-    padding: 16px 18px !important;
-    color: #132846 !important;
-    font-weight: 900 !important;
-    background: linear-gradient(90deg, #f6faff, #ffffff) !important;
-}
-
-.history-box:nth-of-type(2) > summary {
-    background: linear-gradient(90deg, #fff8ed, #ffffff) !important;
-}
-
-.empty {
-    color: #526078 !important;
-    font-weight: 700 !important;
-}
-
-p.empty {
-    padding: 12px 0 !important;
-}
-
-a {
-    color: var(--nba-blue) !important;
-}
-
-.container::after {
-    content: "本報告資料僅供歷史回顧與研究分析使用，不作為任何投資或投注建議。";
-    display: block;
-    margin: 22px auto 0;
-    padding: 14px 18px;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 13px;
-    text-align: center;
-}
-
+.subtitle { color: #64748b !important; margin: 0 0 30px !important; font-size: 13px !important; padding: 0 !important; }
+.subtitle::after { content: none !important; }
+.container > h2 { color: #14233d !important; font-size: 20px !important; margin: 30px 0 12px !important; letter-spacing: -.015em; }
+.container h2 { color: #14233d !important; }
+.nba-muted-caption { color: #64748b; font-size: 13px; margin: -5px 0 12px; }
+.nba-sample-note { color: #8490a3; font-size: 12px; margin: -10px 0 14px; }
+.final-wrap { display: grid !important; grid-template-columns: repeat(3,minmax(0,1fr)) !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important;
+  gap: 14px !important; padding: 0 !important; margin: 0 0 14px !important; overflow: visible !important; }
+.final-card { background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 15px !important; padding: 21px !important;
+  box-shadow: var(--nba-shadow) !important; min-width: 0; }
+.final-card.final-main { border: 2px solid #8299e2 !important; padding: 20px !important; background: #fff !important;
+  box-shadow: 0 0 0 1px #dce4ff !important; }
+.final-level { color: #5e6f8d !important; font-size: 13px !important; font-weight: 850 !important; }
+.final-game { color: #14233d !important; font-size: 16px !important; margin-top: 15px !important; }
+.final-pick { color: #0e1f3a !important; font-size: clamp(23px,2.2vw,30px) !important;
+  letter-spacing: -.035em; margin: 7px 0 12px !important; overflow-wrap: anywhere; }
+.final-score, .final-reason { color: #627087 !important; font-size: 13px !important; line-height: 1.7 !important;
+  overflow-wrap: anywhere; }
+.final-reason { border-top: 1px solid #edf0f5; padding-top: 10px; }
+.cards { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  gap: 14px !important; margin: 0 0 18px !important; }
+.card { background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 13px !important; padding: 20px 24px !important;
+  box-shadow: var(--nba-shadow) !important; }
+.card .label { color: #68758c !important; font-size: 13px !important; font-weight: 750 !important; }
+.card .value { color: #14233d !important; font-size: clamp(20px,2.5vw,28px) !important;
+  margin-top: 5px !important; font-weight: 900 !important; overflow-wrap: anywhere; }
+.section { background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 14px !important; box-shadow: var(--nba-shadow) !important;
+  padding: 14px !important; margin: 0 0 18px !important;
+  overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+table.data-table, .dataframe.data-table { width: 100% !important; border-collapse: collapse !important;
+  border: 0 !important; background: #fff !important; color: var(--nba-ink) !important; }
+table.data-table th, .dataframe.data-table th { color: #586883 !important; font-size: 12px !important;
+  text-align: left; background: #f3f6fb !important; padding: 12px 13px !important;
+  border-bottom: 1px solid var(--nba-line) !important; white-space: nowrap; }
+table.data-table td, .dataframe.data-table td { color: #22314d !important; font-size: 13px !important;
+  padding: 13px 12px !important; vertical-align: top; border-bottom: 1px solid #edf1f6 !important;
+  white-space: nowrap; }
+table.data-table tr:nth-child(even) td, .dataframe.data-table tr:nth-child(even) td { background: #fcfdff !important; }
+.nba-avoidance-results { border-top: 1px solid #dce4ee; margin-top: 32px; padding-top: 5px; }
+.nba-avoidance-results .section { border-color: #e0e7f0 !important; }
+.nba-avoid-meta { display: inline-block; padding: 10px 13px; margin: 0 0 12px; border: 1px solid #dfe6f0;
+  border-radius: 9px; background: #fff; color: #14233d; font-size: 14px; font-weight: 750; }
+.nba-avoid-meta small { color: #64748b; font-weight: 500; font-size: 12px; }
+.history-box, .season-details { background: #fff !important; border: 1px solid var(--nba-line) !important;
+  border-radius: 13px !important; box-shadow: var(--nba-shadow) !important;
+  margin: 12px 0 16px !important; padding: 0 !important; overflow: hidden !important; }
+.history-box > summary, .season-details > summary { list-style: none !important; cursor: pointer !important;
+  background: #fff !important; color: #152946 !important;
+  padding: 17px 19px !important; font-size: 15px !important; font-weight: 800 !important;
+  line-height: 1.65 !important; overflow-wrap: anywhere; }
+.history-box summary::-webkit-details-marker, .season-details summary::-webkit-details-marker { display:none; }
+.history-box > summary::before, .season-details > summary::before { content: ''; color: var(--nba-accent);
+  font-size: 17px; margin-right: 8px; }
+.history-box[open] > summary::before, .season-details[open] > summary::before { content: ''; }
+.history-box[open] > summary, .season-details[open] > summary { border-bottom:1px solid var(--nba-line); }
+.season-details > summary::after { content: '已完成' !important; color: #697789 !important;
+  border: 1px solid #e0e7ef; background: #f8fafc !important;
+  border-radius: 99px; padding: 3px 9px; font-size: 11px !important;
+  float: right; margin: 1px 0 0 8px; }
+.season-details-body { background: #fff !important; color: var(--nba-ink) !important;
+  border: 0 !important; box-shadow: none !important; padding: 18px !important; }
+.verify-summary { background: #f4f6fa !important; border:1px solid #e1e7f0 !important;
+  color: #1f3150 !important; border-radius: 10px !important; box-shadow: none !important; }
+.empty, p.empty { color: #64748b !important; font-weight: 550 !important; }
+.result-win { color: #137c67 !important; } .result-loss, .result-lose { color: #bb3d4a !important; }
+.result-push { color: #96630b !important; } .result-pending { color: #64748b !important; }
+a { color: var(--nba-accent) !important; }
+.container::after { content: '本報告資料僅供研究分析使用，不作為任何投資或投注建議。';
+  display: block; margin: 28px auto 0; text-align: center; color: #8793a5; font-size: 12px; }
 @media (max-width: 900px) {
-    body::before {
-        padding: 14px 18px;
-        font-size: 16px;
-    }
-
-    .container {
-        width: auto !important;
-        margin: 0 !important;
-        padding: 0 12px 24px !important;
-    }
-
-    h1 {
-        padding: 26px 8px 6px !important;
-        font-size: 29px !important;
-    }
-
-    .subtitle {
-        padding: 0 8px 18px !important;
-        font-size: 13px !important;
-        line-height: 1.7 !important;
-    }
-
-    .subtitle::after {
-        display: block;
-        margin-top: 4px;
-    }
-
-    .season-details {
-        border-radius: 15px !important;
-    }
-
-    .season-details > summary {
-        padding: 14px 14px !important;
-        font-size: 15px !important;
-        line-height: 1.65 !important;
-    }
-
-    .season-details > summary::after {
-        float: none;
-        display: inline-block;
-        margin-left: 8px;
-        vertical-align: 1px;
-    }
-
-    .season-details-body {
-        padding: 14px !important;
-    }
-
-    h2 {
-        font-size: 18px !important;
-        margin: 18px 0 10px !important;
-    }
-
-    .cards {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 10px !important;
-    }
-
-    .card {
-        padding: 14px !important;
-    }
-
-    .card .value,
-    .value {
-        font-size: 20px !important;
-    }
-
-    .section,
-    .final-wrap {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        border-radius: 14px !important;
-    }
-
-    table.data-table,
-    .dataframe.data-table {
-        min-width: 720px !important;
-        font-size: 12px !important;
-    }
-
-    table.data-table th,
-    table.data-table td,
-    .dataframe.data-table th,
-    .dataframe.data-table td {
-        white-space: nowrap !important;
-        padding: 9px 8px !important;
-    }
-
-    .history-box > summary {
-        padding: 14px !important;
-        font-size: 14px !important;
-    }
+  .container { padding: 23px 15px 44px !important; }
+  body::before { padding: 14px 17px; }
+  .final-wrap { grid-template-columns: 1fr !important; }
+  .final-card { padding: 17px !important; }
+  .final-card.final-main { padding: 16px !important; }
+  table.data-table, .dataframe.data-table { min-width: 640px !important; }
+  .season-details > summary::after { float: none !important; display: inline-block; }
 }
-
 @media (max-width: 520px) {
-    .cards {
-        grid-template-columns: 1fr !important;
-    }
-
-    h1 {
-        font-size: 26px !important;
-    }
-
-    .season-details > summary {
-        font-size: 14px !important;
-    }
-
-    .container::after {
-        font-size: 12px;
-        line-height: 1.6;
-    }
+  .cards { grid-template-columns: 1fr !important; }
+  .container > h1 { font-size: 29px !important; }
+  .container > h2 { font-size: 18px !important; }
+  .final-pick { font-size: 26px !important; }
+  table.data-table, .dataframe.data-table { min-width: 640px !important; }
 }
-/* NBA_DARK_UI_V1_END */
+/* NBA_TOP3_UI_CLEAR_V1 */
+.final-wrap .final-card.final-main {
+  border: 2px solid #235bcb !important;
+  border-left: 7px solid #235bcb !important;
+  background: #eaf2ff !important;
+  box-shadow: 0 8px 22px rgba(29,78,216,.15) !important;
+}
+.final-wrap .final-card.final-main .final-level {
+  color: #164aa6 !important;
+  font-weight: 900 !important;
+}
+/* NBA_LIGHT_UI_V2_END */
 
 </style>
 </head>
@@ -725,76 +478,235 @@ a {
 <body>
 <div class="container">
     <h1>NBA 2027 賽季 預測報告</h1>
-    <div class="subtitle">產生時間：2026-11-11 22:39:38｜預測日期：2026-11-12</div>
+    <div class="subtitle">產生時間：2026-11-12 01:47:03｜今日比賽：2026-11-12｜保留原始賽前預測</div>
+
+    <h2>今日已儲存的賽前預測</h2><p class="nba-muted-caption">本批預測已在賽前儲存；午夜後保留原始內容，不會改盤口或事後重排。實際結果請見下方驗證區。</p><div class="final-wrap"><div class="final-card final-main"><div class="final-level">🔥 主推｜讓分</div><div class="final-game">金塊 vs 灰熊</div><div class="final-pick">灰熊 +4.5</div><div class="final-score">賽前狀態：推薦｜信心：75%</div></div><div class="final-card"><div class="final-level">🥈 副推｜大小分</div><div class="final-game">巫師 vs 溜馬</div><div class="final-pick">小分 226.5</div><div class="final-score">賽前狀態：不推薦｜信心：61%</div></div></div>
 
     
-    <h2>明日推薦</h2>
-    <div class="final-wrap">
-        <div class="final-card final-main">
-            <div class="final-level">🔥 主推｜讓分</div>
-            <div class="final-game">金塊 vs Memphis Grizzlies</div>
-            <div class="final-pick">Memphis Grizzlies +3.5</div>
-            <div class="final-score">
-                狀態：推薦｜
-                信心：77%｜
-                優勢：9.7 分｜
-                盤口：順盤｜
-                高信心
-            </div>
-
-            <div class="final-reason">
-                預測主隊分差 +6.2，盤口 +3.5，主隊有 9.7 分優勢。
-            </div>
-        </div>
-        
-
-        <div class="final-card">
-            <div class="final-level">🥈 副推｜大小分</div>
-            <div class="final-game">塞爾提克 vs 暴龍</div>
-            <div class="final-pick">大分 216.5</div>
-            <div class="final-score">
-                狀態：推薦｜
-                信心：70%｜
-                優勢：4.8 分｜
-                盤口：順盤｜
-                高信心
-            </div>
-
-            <div class="final-reason">
-                預測總分 221.3，盤口 216.5，大分有 4.8 分優勢。
-            </div>
-        </div>
-        
-
-        <div class="final-card">
-            <div class="final-level">🥉 副推｜讓分</div>
-            <div class="final-game">魔術 vs 爵士</div>
-            <div class="final-pick">爵士 +3.5</div>
-            <div class="final-score">
-                狀態：不推薦｜
-                信心：66%｜
-                優勢：4.0 分｜
-                盤口：順盤｜
-                不推薦
-            </div>
-
-            <div class="final-reason">
-                預測主隊分差 +0.5，盤口 +3.5，主隊有 4.0 分優勢。
-            </div>
-        </div>
-        </div>
-
-
-    
-
-    
-        <h2>2027 賽季 當季表現</h2>
+        <h2>2027 賽季 正式推薦表現</h2>
+        <p class="nba-muted-caption">只計入賽前實際標記為「推薦」、且已有賽果的紀錄。未推薦候選不列入勝率。</p>
         <div class="cards">
           <div class="card"><div class="label">主推勝率</div><div class="value">1/1（100.0%）</div></div>
-          <div class="card"><div class="label">Top3 勝率</div><div class="value">2/2（100.0%）</div></div>
-          <div class="card"><div class="label">當季總勝率</div><div class="value">2/2（100.0%）</div></div>
-          <div class="card"><div class="label">不推薦避開率</div><div class="value">2/4（50.0%）</div></div>
+          <div class="card"><div class="label">Top3 已推薦勝率</div><div class="value">2/2（100.0%）</div></div>
         </div>
+        <p class="nba-sample-note">目前樣本數仍有限，勝率僅代表已有紀錄的結果，不代表未來命中率。</p>
+
+    <section class='nba-recommended-results'><h2>最近推薦驗證（近 7 筆）</h2><p class='nba-muted-caption'>僅列賽前標記「推薦」且已完賽可驗證的紀錄，不含未推薦候選。</p><div class='section'><table border="1" class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>日期</th>
+      <th>隊伍</th>
+      <th>等級</th>
+      <th>預測</th>
+      <th>比分</th>
+      <th>結果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2026-11-09</td>
+      <td>熱火 vs 國王</td>
+      <td>主推</td>
+      <td>國王 +10.5</td>
+      <td>114-108</td>
+      <td>✅ 過</td>
+    </tr>
+    <tr>
+      <td>2026-11-09</td>
+      <td>爵士 vs 灰狼</td>
+      <td>副推 1</td>
+      <td>灰狼 -11.5</td>
+      <td>100-115</td>
+      <td>✅ 過</td>
+    </tr>
+  </tbody>
+</table></div></section><section class='nba-avoidance-results'><h2>未推薦候選追蹤（近 7 筆）</h2><p class='nba-muted-caption'>與正式推薦的勝率完全分開。原候選沒過＝避開了該候選；不是賽前推薦相反方向。</p><div class='nba-avoid-meta'>本季原候選沒過比例：2/4（50.0%） <small>（只計算已驗證的不推薦候選）</small></div><div class='section'><table border="1" class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>日期</th>
+      <th>隊伍</th>
+      <th>等級</th>
+      <th>預測</th>
+      <th>信心</th>
+      <th>比分</th>
+      <th>結果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2026-11-11</td>
+      <td>塞爾提克 vs 76人</td>
+      <td>主推</td>
+      <td>大分 215.5</td>
+      <td>61%</td>
+      <td>123-101</td>
+      <td>❌ 原候選過</td>
+    </tr>
+    <tr>
+      <td>2026-11-10</td>
+      <td>馬刺 vs 太陽</td>
+      <td>主推</td>
+      <td>馬刺 -8.5</td>
+      <td>68%</td>
+      <td>122-96</td>
+      <td>❌ 原候選過</td>
+    </tr>
+    <tr>
+      <td>2026-11-10</td>
+      <td>金塊 vs 火箭</td>
+      <td>副推 1</td>
+      <td>大分 217.5</td>
+      <td>68%</td>
+      <td>100-110</td>
+      <td>✅ 原候選沒過</td>
+    </tr>
+    <tr>
+      <td>2026-11-09</td>
+      <td>76人 vs 公牛</td>
+      <td>副推 2</td>
+      <td>小分 237.5</td>
+      <td>68%</td>
+      <td>127-121</td>
+      <td>✅ 原候選沒過</td>
+    </tr>
+  </tbody>
+</table></div></section>
+
+    
+    <h2>當季歷史紀錄</h2>
+    <details class='history-box' id='season-history'>
+      <summary>📂 展開 2027 賽季 當季預測紀錄（最新：2026-11-12）</summary>
+      <div class='section'>
+        <p class='empty'>以下是當季已儲存的預測，不等於今天或明天的即時推薦。未完賽及缺少賽果的項目會明確標示。</p>
+        <details class='history-box'><summary>✅ 已推薦紀錄（最近 30 筆，共 3 筆）</summary>
+          <div class='section'><table border="1" class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>日期</th>
+      <th>隊伍</th>
+      <th>比分</th>
+      <th>等級</th>
+      <th>類型</th>
+      <th>預測</th>
+      <th>信心</th>
+      <th>狀態</th>
+      <th>結果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2026-11-12</td>
+      <td>金塊 vs 灰熊</td>
+      <td>—</td>
+      <td>主推</td>
+      <td>讓分</td>
+      <td>灰熊 +4.5</td>
+      <td>75%</td>
+      <td>推薦</td>
+      <td>未完賽</td>
+    </tr>
+    <tr>
+      <td>2026-11-09</td>
+      <td>熱火 vs 國王</td>
+      <td>114-108</td>
+      <td>主推</td>
+      <td>讓分</td>
+      <td>國王 +10.5</td>
+      <td>73%</td>
+      <td>推薦</td>
+      <td>✅ 過</td>
+    </tr>
+    <tr>
+      <td>2026-11-09</td>
+      <td>爵士 vs 灰狼</td>
+      <td>100-115</td>
+      <td>副推 1</td>
+      <td>讓分</td>
+      <td>灰狼 -11.5</td>
+      <td>73%</td>
+      <td>推薦</td>
+      <td>✅ 過</td>
+    </tr>
+  </tbody>
+</table></div>
+        </details>
+        <details class='history-box'><summary>🟡 不推薦／PASS 紀錄（最近 30 筆，共 5 筆）</summary>
+          <div class='section'><table border="1" class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>日期</th>
+      <th>隊伍</th>
+      <th>比分</th>
+      <th>等級</th>
+      <th>類型</th>
+      <th>預測</th>
+      <th>信心</th>
+      <th>狀態</th>
+      <th>結果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2026-11-12</td>
+      <td>巫師 vs 溜馬</td>
+      <td>—</td>
+      <td>副推 1</td>
+      <td>大小分</td>
+      <td>小分 226.5</td>
+      <td>61%</td>
+      <td>不推薦</td>
+      <td>未完賽</td>
+    </tr>
+    <tr>
+      <td>2026-11-11</td>
+      <td>塞爾提克 vs 76人</td>
+      <td>123-101</td>
+      <td>主推</td>
+      <td>大小分</td>
+      <td>大分 215.5</td>
+      <td>61%</td>
+      <td>不推薦</td>
+      <td>❌ 原候選過</td>
+    </tr>
+    <tr>
+      <td>2026-11-10</td>
+      <td>馬刺 vs 太陽</td>
+      <td>122-96</td>
+      <td>主推</td>
+      <td>讓分</td>
+      <td>馬刺 -8.5</td>
+      <td>68%</td>
+      <td>不推薦</td>
+      <td>❌ 原候選過</td>
+    </tr>
+    <tr>
+      <td>2026-11-10</td>
+      <td>金塊 vs 火箭</td>
+      <td>100-110</td>
+      <td>副推 1</td>
+      <td>大小分</td>
+      <td>大分 217.5</td>
+      <td>68%</td>
+      <td>不推薦</td>
+      <td>✅ 原候選沒過</td>
+    </tr>
+    <tr>
+      <td>2026-11-09</td>
+      <td>76人 vs 公牛</td>
+      <td>127-121</td>
+      <td>副推 2</td>
+      <td>大小分</td>
+      <td>小分 237.5</td>
+      <td>68%</td>
+      <td>不推薦</td>
+      <td>✅ 原候選沒過</td>
+    </tr>
+  </tbody>
+</table></div>
+        </details>
+      </div>
+    </details>
+    
 
     
         <details class="season-details">
