@@ -494,7 +494,16 @@
 401909976,2026-11-13 08:00,2026-11-13,Toronto Raptors,Philadelphia 76ers,TOR,PHI,112,123,True,Final,,,,🔴 FINAL,
 401909977,2026-11-13 08:00,2026-11-13,Detroit Pistons,Washington Wizards,DET,WSH,144,140,True,Final,,,,🔴 FINAL,
 401909978,2026-11-13 09:00,2026-11-13,Dallas Mavericks,Minnesota Timberwolves,DAL,MIN,94,133,True,Final,,,,🔴 FINAL,
-401909979,2026-11-13 10:00,2026-11-13,Charlotte Hornets,Phoenix Suns,CHA,PHX,62,59,False,In Progress,,,,🟢 LIVE,
+401909979,2026-11-13 10:00,2026-11-13,Charlotte Hornets,Phoenix Suns,CHA,PHX,96,101,True,Final,,,,🔴 FINAL,
+401909296,2026-11-14 08:00,2026-11-14,New York Knicks,Indiana Pacers,NY,IND,0,0,False,Scheduled,6.5,219.5,NY -6.5,⏳ Scheduled,NBA Cup - Group Play
+401909297,2026-11-14 08:00,2026-11-14,Milwaukee Bucks,Orlando Magic,MIL,ORL,0,0,False,Scheduled,-9.5,223.5,ORL -9.5,⏳ Scheduled,NBA Cup - Group Play
+401909298,2026-11-14 09:00,2026-11-14,Cleveland Cavaliers,Miami Heat,CLE,MIA,0,0,False,Scheduled,-2.5,236.5,MIA -2.5,⏳ Scheduled,NBA Cup - Group Play
+401909299,2026-11-14 09:00,2026-11-14,Atlanta Hawks,Chicago Bulls,ATL,CHI,0,0,False,Scheduled,6.5,245.5,ATL -6.5,⏳ Scheduled,NBA Cup - Group Play
+401909300,2026-11-14 09:00,2026-11-14,Memphis Grizzlies,New Orleans Pelicans,MEM,NO,0,0,False,Scheduled,3.5,235.5,MEM -3.5,⏳ Scheduled,NBA Cup - Group Play
+401909301,2026-11-14 09:30,2026-11-14,Utah Jazz,Houston Rockets,UTAH,HOU,0,0,False,Scheduled,-16.5,219.5,HOU -16.5,⏳ Scheduled,NBA Cup - Group Play
+401909302,2026-11-14 10:30,2026-11-14,Golden State Warriors,San Antonio Spurs,GS,SA,0,0,False,Scheduled,-12.5,219.5,SA -12.5,⏳ Scheduled,NBA Cup - Group Play
+401909303,2026-11-14 11:00,2026-11-14,Portland Trail Blazers,Sacramento Kings,POR,SAC,0,0,False,Scheduled,10.5,228.5,POR -10.5,⏳ Scheduled,NBA Cup - Group Play
+401909304,2026-11-14 11:30,2026-11-14,Oklahoma City Thunder,LA Clippers,OKC,LAC,0,0,False,Scheduled,7.5,222.5,OKC -7.5,⏳ Scheduled,NBA Cup - Group Play
 401909960,2026-11-11 08:30,2026-11-11,Milwaukee Bucks,New York Knicks,MIL,NY,85,117,True,Final,,,,🔴 FINAL,
 401909961,2026-11-11 09:00,2026-11-11,Boston Celtics,Philadelphia 76ers,BOS,PHI,123,101,True,Final,,,,🔴 FINAL,
 401909962,2026-11-11 10:00,2026-11-11,LA Clippers,Phoenix Suns,LAC,PHX,110,133,True,Final,,,,🔴 FINAL,
