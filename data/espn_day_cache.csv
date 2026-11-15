@@ -506,11 +506,11 @@
 401909302,2026-11-14 10:30,2026-11-14,Golden State Warriors,San Antonio Spurs,GS,SA,85,123,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909303,2026-11-14 11:00,2026-11-14,Portland Trail Blazers,Sacramento Kings,POR,SAC,120,107,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909304,2026-11-14 11:30,2026-11-14,Oklahoma City Thunder,LA Clippers,OKC,LAC,112,113,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909980,2026-11-15 08:00,2026-11-15,Denver Nuggets,New Orleans Pelicans,DEN,NO,56,51,False,Halftime,,,,🟢 LIVE,
-401909981,2026-11-15 08:30,2026-11-15,Dallas Mavericks,Cleveland Cavaliers,DAL,CLE,37,41,False,In Progress,,,,🟢 LIVE,
-401909982,2026-11-15 09:00,2026-11-15,Detroit Pistons,Miami Heat,DET,MIA,7,5,False,In Progress,,,,🟢 LIVE,
-401909983,2026-11-15 09:00,2026-11-15,Brooklyn Nets,Memphis Grizzlies,BKN,MEM,7,8,False,In Progress,,,,🟢 LIVE,
-401909984,2026-11-15 09:00,2026-11-15,Chicago Bulls,Minnesota Timberwolves,CHI,MIN,4,4,False,In Progress,,,,🟢 LIVE,
+401909980,2026-11-15 08:00,2026-11-15,Denver Nuggets,New Orleans Pelicans,DEN,NO,116,108,True,Final,,,,🔴 FINAL,
+401909981,2026-11-15 08:30,2026-11-15,Dallas Mavericks,Cleveland Cavaliers,DAL,CLE,112,124,False,In Progress,,,,🟢 LIVE,
+401909982,2026-11-15 09:00,2026-11-15,Detroit Pistons,Miami Heat,DET,MIA,76,87,False,In Progress,,,,🟢 LIVE,
+401909983,2026-11-15 09:00,2026-11-15,Brooklyn Nets,Memphis Grizzlies,BKN,MEM,84,103,False,In Progress,,,,🟢 LIVE,
+401909984,2026-11-15 09:00,2026-11-15,Chicago Bulls,Minnesota Timberwolves,CHI,MIN,92,84,False,In Progress,,,,🟢 LIVE,
 401909976,2026-11-13 08:00,2026-11-13,Toronto Raptors,Philadelphia 76ers,TOR,PHI,112,123,True,Final,,,,🔴 FINAL,
 401909977,2026-11-13 08:00,2026-11-13,Detroit Pistons,Washington Wizards,DET,WSH,144,140,True,Final,,,,🔴 FINAL,
 401909978,2026-11-13 09:00,2026-11-13,Dallas Mavericks,Minnesota Timberwolves,DAL,MIN,94,133,True,Final,,,,🔴 FINAL,
