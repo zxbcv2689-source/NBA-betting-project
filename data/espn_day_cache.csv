@@ -542,14 +542,14 @@
 401910021,2026-11-20 09:00,2026-11-20,New York Knicks,Minnesota Timberwolves,NY,MIN,102,99,True,Final,,,,🔴 FINAL,
 401910022,2026-11-20 09:00,2026-11-20,LA Clippers,San Antonio Spurs,LAC,SA,112,124,True,Final,,,,🔴 FINAL,
 401909305,2026-11-21 08:00,2026-11-21,Charlotte Hornets,Atlanta Hawks,CHA,ATL,97,111,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909306,2026-11-21 08:30,2026-11-21,Orlando Magic,Brooklyn Nets,ORL,BKN,93,98,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
-401909307,2026-11-21 08:30,2026-11-21,Indiana Pacers,Cleveland Cavaliers,IND,CLE,101,115,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
-401909308,2026-11-21 08:30,2026-11-21,Toronto Raptors,Detroit Pistons,TOR,DET,89,84,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
-401909309,2026-11-21 09:00,2026-11-21,Washington Wizards,Chicago Bulls,WSH,CHI,75,69,False,End of Period,,,,🟢 LIVE,NBA Cup - Group Play
-401909310,2026-11-21 09:00,2026-11-21,New Orleans Pelicans,Oklahoma City Thunder,NO,OKC,97,88,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
-401909311,2026-11-21 10:30,2026-11-21,Phoenix Suns,Utah Jazz,PHX,UTAH,0,0,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
-401909312,2026-11-21 11:00,2026-11-21,Houston Rockets,Denver Nuggets,HOU,DEN,0,0,False,Scheduled,1.5,227.5,HOU -1.5,⏳ Scheduled,NBA Cup - Group Play
-401909313,2026-11-21 11:00,2026-11-21,Sacramento Kings,Los Angeles Lakers,SAC,LAL,0,0,False,Scheduled,-14.5,229.5,LAL -14.5,⏳ Scheduled,NBA Cup - Group Play
+401909306,2026-11-21 08:30,2026-11-21,Orlando Magic,Brooklyn Nets,ORL,BKN,113,111,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909307,2026-11-21 08:30,2026-11-21,Indiana Pacers,Cleveland Cavaliers,IND,CLE,119,128,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909308,2026-11-21 08:30,2026-11-21,Toronto Raptors,Detroit Pistons,TOR,DET,105,102,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909309,2026-11-21 09:00,2026-11-21,Washington Wizards,Chicago Bulls,WSH,CHI,98,94,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909310,2026-11-21 09:00,2026-11-21,New Orleans Pelicans,Oklahoma City Thunder,NO,OKC,120,126,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909311,2026-11-21 10:30,2026-11-21,Phoenix Suns,Utah Jazz,PHX,UTAH,76,64,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
+401909312,2026-11-21 11:00,2026-11-21,Houston Rockets,Denver Nuggets,HOU,DEN,56,60,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
+401909313,2026-11-21 11:00,2026-11-21,Sacramento Kings,Los Angeles Lakers,SAC,LAL,62,54,False,Halftime,,,,🟢 LIVE,NBA Cup - Group Play
 401910007,2026-11-19 08:00,2026-11-19,Memphis Grizzlies,Cleveland Cavaliers,MEM,CLE,124,121,True,Final,,,,🔴 FINAL,
 401910008,2026-11-19 08:00,2026-11-19,Houston Rockets,Indiana Pacers,HOU,IND,119,104,True,Final,,,,🔴 FINAL,
 401910009,2026-11-19 08:00,2026-11-19,Milwaukee Bucks,Miami Heat,MIL,MIA,130,137,True,Final,,,,🔴 FINAL,
