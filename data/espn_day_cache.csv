@@ -559,11 +559,11 @@
 401909312,2026-11-21 11:00,2026-11-21,Houston Rockets,Denver Nuggets,HOU,DEN,124,133,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909313,2026-11-21 11:00,2026-11-21,Sacramento Kings,Los Angeles Lakers,SAC,LAL,104,106,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401910023,2026-11-22 02:00,2026-11-22,Milwaukee Bucks,Philadelphia 76ers,MIL,PHI,129,132,True,Final,,,,🔴 FINAL,
-401910024,2026-11-22 08:30,2026-11-22,Portland Trail Blazers,New York Knicks,POR,NY,40,58,False,In Progress,,,,🟢 LIVE,
-401910025,2026-11-22 09:00,2026-11-22,LA Clippers,Dallas Mavericks,LAC,DAL,20,18,False,In Progress,,,,🟢 LIVE,
-401910026,2026-11-22 09:00,2026-11-22,Memphis Grizzlies,Minnesota Timberwolves,MEM,MIN,32,23,False,In Progress,,,,🟢 LIVE,
-401910027,2026-11-22 09:00,2026-11-22,New Orleans Pelicans,San Antonio Spurs,NO,SA,19,20,False,In Progress,,,,🟢 LIVE,
-401910028,2026-11-22 11:00,2026-11-22,Boston Celtics,Sacramento Kings,BOS,SAC,0,0,False,Scheduled,11.5,215.5,BOS -11.5,⏳ Scheduled,
+401910024,2026-11-22 08:30,2026-11-22,Portland Trail Blazers,New York Knicks,POR,NY,96,97,True,Final,,,,🔴 FINAL,
+401910025,2026-11-22 09:00,2026-11-22,LA Clippers,Dallas Mavericks,LAC,DAL,88,102,False,In Progress,,,,🟢 LIVE,
+401910026,2026-11-22 09:00,2026-11-22,Memphis Grizzlies,Minnesota Timberwolves,MEM,MIN,95,104,True,Final,,,,🔴 FINAL,
+401910027,2026-11-22 09:00,2026-11-22,New Orleans Pelicans,San Antonio Spurs,NO,SA,88,112,False,In Progress,,,,🟢 LIVE,
+401910028,2026-11-22 11:00,2026-11-22,Boston Celtics,Sacramento Kings,BOS,SAC,15,6,False,In Progress,,,,🟢 LIVE,
 401910019,2026-11-20 09:00,2026-11-20,Golden State Warriors,Memphis Grizzlies,GS,MEM,98,126,True,Final,,,,🔴 FINAL,
 401910020,2026-11-20 09:00,2026-11-20,Portland Trail Blazers,Milwaukee Bucks,POR,MIL,124,114,True,Final,,,,🔴 FINAL,
 401910021,2026-11-20 09:00,2026-11-20,New York Knicks,Minnesota Timberwolves,NY,MIN,102,99,True,Final,,,,🔴 FINAL,
