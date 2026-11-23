@@ -565,7 +565,17 @@
 401910032,2026-11-23 08:00,2026-11-23,Denver Nuggets,Chicago Bulls,DEN,CHI,151,145,True,Final,,,,🔴 FINAL,
 401910033,2026-11-23 08:00,2026-11-23,Dallas Mavericks,Utah Jazz,DAL,UTAH,116,114,True,Final,,,,🔴 FINAL,
 401910034,2026-11-23 09:00,2026-11-23,Indiana Pacers,New York Knicks,IND,NY,106,113,True,Final,,,,🔴 FINAL,
-401910035,2026-11-23 09:30,2026-11-23,Boston Celtics,Golden State Warriors,BOS,GS,87,88,False,In Progress,,,,🟢 LIVE,
+401910035,2026-11-23 09:30,2026-11-23,Boston Celtics,Golden State Warriors,BOS,GS,87,88,True,Final,,,,🔴 FINAL,
+401910036,2026-11-24 08:00,2026-11-24,Memphis Grizzlies,Charlotte Hornets,MEM,CHA,0,0,False,Scheduled,3.5,216.5,MEM -3.5,⏳ Scheduled,
+401910037,2026-11-24 08:00,2026-11-24,Portland Trail Blazers,Philadelphia 76ers,POR,PHI,0,0,False,Scheduled,-3.5,231.5,PHI -3.5,⏳ Scheduled,
+401910038,2026-11-24 08:30,2026-11-24,Oklahoma City Thunder,Indiana Pacers,OKC,IND,0,0,False,Scheduled,4.5,222.5,OKC -4.5,⏳ Scheduled,
+401910039,2026-11-24 08:30,2026-11-24,Milwaukee Bucks,Toronto Raptors,MIL,TOR,0,0,False,Scheduled,-10.5,223.5,TOR -10.5,⏳ Scheduled,
+401910040,2026-11-24 08:30,2026-11-24,Brooklyn Nets,Minnesota Timberwolves,BKN,MIN,0,0,False,Scheduled,-12.5,223.5,MIN -12.5,⏳ Scheduled,
+401910041,2026-11-24 09:00,2026-11-24,Cleveland Cavaliers,Chicago Bulls,CLE,CHI,0,0,False,Scheduled,8.5,240.5,CLE -8.5,⏳ Scheduled,
+401910042,2026-11-24 09:00,2026-11-24,Phoenix Suns,New Orleans Pelicans,PHX,NO,0,0,False,Scheduled,3.5,233.5,PHX -3.5,⏳ Scheduled,
+401910043,2026-11-24 09:30,2026-11-24,LA Clippers,Houston Rockets,LAC,HOU,0,0,False,Scheduled,-12.5,225.5,HOU -12.5,⏳ Scheduled,
+401910044,2026-11-24 11:00,2026-11-24,Utah Jazz,Los Angeles Lakers,UTAH,LAL,0,0,False,Scheduled,-13.5,228.5,LAL -13.5,⏳ Scheduled,
+401910045,2026-11-24 11:00,2026-11-24,San Antonio Spurs,Sacramento Kings,SA,SAC,0,0,False,Scheduled,10.5,224.5,SA -10.5,⏳ Scheduled,
 401909305,2026-11-21 08:00,2026-11-21,Charlotte Hornets,Atlanta Hawks,CHA,ATL,97,111,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909306,2026-11-21 08:30,2026-11-21,Orlando Magic,Brooklyn Nets,ORL,BKN,113,111,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909307,2026-11-21 08:30,2026-11-21,Indiana Pacers,Cleveland Cavaliers,IND,CLE,119,128,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
