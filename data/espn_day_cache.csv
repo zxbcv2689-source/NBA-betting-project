@@ -577,8 +577,11 @@
 401910041,2026-11-24 09:00,2026-11-24,Cleveland Cavaliers,Chicago Bulls,CLE,CHI,108,122,True,Final,,,,🔴 FINAL,
 401910042,2026-11-24 09:00,2026-11-24,Phoenix Suns,New Orleans Pelicans,PHX,NO,123,119,True,Final,,,,🔴 FINAL,
 401910043,2026-11-24 09:30,2026-11-24,LA Clippers,Houston Rockets,LAC,HOU,104,116,True,Final,,,,🔴 FINAL,
-401910044,2026-11-24 11:00,2026-11-24,Utah Jazz,Los Angeles Lakers,UTAH,LAL,90,103,False,In Progress,,,,🟢 LIVE,
+401910044,2026-11-24 11:00,2026-11-24,Utah Jazz,Los Angeles Lakers,UTAH,LAL,94,109,True,Final,,,,🔴 FINAL,
 401910045,2026-11-24 11:00,2026-11-24,San Antonio Spurs,Sacramento Kings,SA,SAC,123,107,True,Final,,,,🔴 FINAL,
+401909314,2026-11-25 08:00,2026-11-25,Detroit Pistons,Orlando Magic,DET,ORL,0,0,False,Scheduled,2.5,213.5,DET -2.5,⏳ Scheduled,NBA Cup - Group Play
+401909315,2026-11-25 09:00,2026-11-25,Boston Celtics,Washington Wizards,BOS,WSH,0,0,False,Scheduled,10.5,217.5,BOS -10.5,⏳ Scheduled,NBA Cup - Group Play
+401909316,2026-11-25 11:00,2026-11-25,Dallas Mavericks,Denver Nuggets,DAL,DEN,0,0,False,Scheduled,-8.5,232.5,DEN -8.5,⏳ Scheduled,NBA Cup - Group Play
 401910023,2026-11-22 02:00,2026-11-22,Milwaukee Bucks,Philadelphia 76ers,MIL,PHI,129,132,True,Final,,,,🔴 FINAL,
 401910024,2026-11-22 08:30,2026-11-22,Portland Trail Blazers,New York Knicks,POR,NY,96,97,True,Final,,,,🔴 FINAL,
 401910025,2026-11-22 09:00,2026-11-22,LA Clippers,Dallas Mavericks,LAC,DAL,100,110,True,Final,,,,🔴 FINAL,
