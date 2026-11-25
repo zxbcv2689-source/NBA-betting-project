@@ -580,7 +580,16 @@
 401910045,2026-11-24 11:00,2026-11-24,San Antonio Spurs,Sacramento Kings,SA,SAC,123,107,True,Final,,,,🔴 FINAL,
 401909314,2026-11-25 08:00,2026-11-25,Detroit Pistons,Orlando Magic,DET,ORL,104,86,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909315,2026-11-25 09:00,2026-11-25,Boston Celtics,Washington Wizards,BOS,WSH,131,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909316,2026-11-25 11:00,2026-11-25,Dallas Mavericks,Denver Nuggets,DAL,DEN,120,101,False,In Progress,,,,🟢 LIVE,NBA Cup - Group Play
+401909316,2026-11-25 11:00,2026-11-25,Dallas Mavericks,Denver Nuggets,DAL,DEN,120,101,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909317,2026-11-26 06:00,2026-11-26,Miami Heat,Philadelphia 76ers,MIA,PHI,0,0,False,Scheduled,-1.5,237.5,PHI -1.5,⏳ Scheduled,NBA Cup - Group Play
+401909318,2026-11-26 08:00,2026-11-26,Chicago Bulls,Charlotte Hornets,CHI,CHA,0,0,False,Scheduled,-3.5,222.5,CHA -3.5,⏳ Scheduled,NBA Cup - Group Play
+401909319,2026-11-26 08:30,2026-11-26,Cleveland Cavaliers,New York Knicks,CLE,NY,0,0,False,Scheduled,-3.5,219.5,NY -3.5,⏳ Scheduled,NBA Cup - Group Play
+401909320,2026-11-26 08:30,2026-11-26,Minnesota Timberwolves,Oklahoma City Thunder,MIN,OKC,0,0,False,Scheduled,-1.5,223.5,OKC -1.5,⏳ Scheduled,NBA Cup - Group Play
+401909321,2026-11-26 09:00,2026-11-26,LA Clippers,Memphis Grizzlies,LAC,MEM,0,0,False,Scheduled,-6.5,229.5,MEM -6.5,⏳ Scheduled,NBA Cup - Group Play
+401909322,2026-11-26 09:00,2026-11-26,Brooklyn Nets,Milwaukee Bucks,BKN,MIL,0,0,False,Scheduled,-1.5,232.5,MIL -1.5,⏳ Scheduled,NBA Cup - Group Play
+401909323,2026-11-26 09:30,2026-11-26,Phoenix Suns,Houston Rockets,PHX,HOU,0,0,False,Scheduled,-9.5,224.5,HOU -9.5,⏳ Scheduled,NBA Cup - Group Play
+401909324,2026-11-26 11:00,2026-11-26,Sacramento Kings,Golden State Warriors,SAC,GS,0,0,False,Scheduled,-5.5,218.5,GS -5.5,⏳ Scheduled,NBA Cup - Group Play
+401909325,2026-11-26 11:00,2026-11-26,San Antonio Spurs,Portland Trail Blazers,SA,POR,0,0,False,Scheduled,2.5,226.5,SA -2.5,⏳ Scheduled,NBA Cup - Group Play
 401910029,2026-11-23 04:30,2026-11-23,Detroit Pistons,Atlanta Hawks,DET,ATL,97,107,True,Final,,,,🔴 FINAL,
 401910030,2026-11-23 07:00,2026-11-23,Oklahoma City Thunder,Miami Heat,OKC,MIA,113,123,True,Final,,,,🔴 FINAL,
 401910031,2026-11-23 08:00,2026-11-23,Orlando Magic,Washington Wizards,ORL,WSH,96,116,True,Final,,,,🔴 FINAL,
