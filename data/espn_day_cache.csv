@@ -575,18 +575,6 @@
 401910033,2026-11-23 08:00,2026-11-23,Dallas Mavericks,Utah Jazz,DAL,UTAH,116,114,True,Final,,,,🔴 FINAL,
 401910034,2026-11-23 09:00,2026-11-23,Indiana Pacers,New York Knicks,IND,NY,106,113,True,Final,,,,🔴 FINAL,
 401910035,2026-11-23 09:30,2026-11-23,Boston Celtics,Golden State Warriors,BOS,GS,87,88,True,Final,,,,🔴 FINAL,
-401909314,2026-11-25 08:00,2026-11-25,Detroit Pistons,Orlando Magic,DET,ORL,104,86,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909315,2026-11-25 09:00,2026-11-25,Boston Celtics,Washington Wizards,BOS,WSH,131,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909316,2026-11-25 11:00,2026-11-25,Dallas Mavericks,Denver Nuggets,DAL,DEN,120,101,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909317,2026-11-26 06:00,2026-11-26,Miami Heat,Philadelphia 76ers,MIA,PHI,104,111,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909318,2026-11-26 08:00,2026-11-26,Chicago Bulls,Charlotte Hornets,CHI,CHA,107,105,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909319,2026-11-26 08:30,2026-11-26,Cleveland Cavaliers,New York Knicks,CLE,NY,102,121,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909320,2026-11-26 08:30,2026-11-26,Minnesota Timberwolves,Oklahoma City Thunder,MIN,OKC,113,106,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909321,2026-11-26 09:00,2026-11-26,LA Clippers,Memphis Grizzlies,LAC,MEM,97,115,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909322,2026-11-26 09:00,2026-11-26,Brooklyn Nets,Milwaukee Bucks,BKN,MIL,104,97,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909323,2026-11-26 09:30,2026-11-26,Phoenix Suns,Houston Rockets,PHX,HOU,104,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909324,2026-11-26 11:00,2026-11-26,Sacramento Kings,Golden State Warriors,SAC,GS,110,129,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
-401909325,2026-11-26 11:00,2026-11-26,San Antonio Spurs,Portland Trail Blazers,SA,POR,111,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401910036,2026-11-24 08:00,2026-11-24,Memphis Grizzlies,Charlotte Hornets,MEM,CHA,117,111,True,Final,,,,🔴 FINAL,
 401910037,2026-11-24 08:00,2026-11-24,Portland Trail Blazers,Philadelphia 76ers,POR,PHI,128,111,True,Final,,,,🔴 FINAL,
 401910038,2026-11-24 08:30,2026-11-24,Oklahoma City Thunder,Indiana Pacers,OKC,IND,120,125,True,Final,,,,🔴 FINAL,
@@ -597,6 +585,29 @@
 401910043,2026-11-24 09:30,2026-11-24,LA Clippers,Houston Rockets,LAC,HOU,104,116,True,Final,,,,🔴 FINAL,
 401910044,2026-11-24 11:00,2026-11-24,Utah Jazz,Los Angeles Lakers,UTAH,LAL,94,109,True,Final,,,,🔴 FINAL,
 401910045,2026-11-24 11:00,2026-11-24,San Antonio Spurs,Sacramento Kings,SA,SAC,123,107,True,Final,,,,🔴 FINAL,
+401909314,2026-11-25 08:00,2026-11-25,Detroit Pistons,Orlando Magic,DET,ORL,104,86,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909315,2026-11-25 09:00,2026-11-25,Boston Celtics,Washington Wizards,BOS,WSH,131,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909316,2026-11-25 11:00,2026-11-25,Dallas Mavericks,Denver Nuggets,DAL,DEN,120,101,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909326,2026-11-28 08:00,2026-11-28,Miami Heat,New York Knicks,MIA,NY,0,0,False,Scheduled,-4.5,224.5,NY -4.5,⏳ Scheduled,NBA Cup - Group Play
+401909327,2026-11-28 08:30,2026-11-28,Milwaukee Bucks,Detroit Pistons,MIL,DET,0,0,False,Scheduled,,,,⏳ Scheduled,NBA Cup - Group Play
+401909328,2026-11-28 08:30,2026-11-28,Philadelphia 76ers,Indiana Pacers,PHI,IND,0,0,False,Scheduled,4.5,234.5,PHI -4.5,⏳ Scheduled,NBA Cup - Group Play
+401909329,2026-11-28 08:30,2026-11-28,Brooklyn Nets,Toronto Raptors,BKN,TOR,0,0,False,Scheduled,,,,⏳ Scheduled,NBA Cup - Group Play
+401909330,2026-11-28 09:00,2026-11-28,Atlanta Hawks,Boston Celtics,ATL,BOS,0,0,False,Scheduled,-9.5,221.5,BOS -9.5,⏳ Scheduled,NBA Cup - Group Play
+401909331,2026-11-28 09:30,2026-11-28,Memphis Grizzlies,Minnesota Timberwolves,MEM,MIN,0,0,False,Scheduled,,,,⏳ Scheduled,NBA Cup - Group Play
+401909332,2026-11-28 10:00,2026-11-28,Dallas Mavericks,Phoenix Suns,DAL,PHX,0,0,False,Scheduled,,,,⏳ Scheduled,NBA Cup - Group Play
+401909333,2026-11-28 10:30,2026-11-28,Los Angeles Lakers,San Antonio Spurs,LAL,SA,0,0,False,Scheduled,-6.5,225.5,SA -6.5,⏳ Scheduled,NBA Cup - Group Play
+401909334,2026-11-28 10:30,2026-11-28,Denver Nuggets,Utah Jazz,DEN,UTAH,0,0,False,Scheduled,9.5,228.5,DEN -9.5,⏳ Scheduled,NBA Cup - Group Play
+401909335,2026-11-28 10:30,2026-11-28,New Orleans Pelicans,LA Clippers,NO,LAC,0,0,False,Scheduled,,,,⏳ Scheduled,NBA Cup - Group Play
+401909336,2026-11-28 10:30,2026-11-28,Golden State Warriors,Portland Trail Blazers,GS,POR,0,0,False,Scheduled,,,,⏳ Scheduled,NBA Cup - Group Play
+401909317,2026-11-26 06:00,2026-11-26,Miami Heat,Philadelphia 76ers,MIA,PHI,104,111,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909318,2026-11-26 08:00,2026-11-26,Chicago Bulls,Charlotte Hornets,CHI,CHA,107,105,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909319,2026-11-26 08:30,2026-11-26,Cleveland Cavaliers,New York Knicks,CLE,NY,102,121,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909320,2026-11-26 08:30,2026-11-26,Minnesota Timberwolves,Oklahoma City Thunder,MIN,OKC,113,106,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909321,2026-11-26 09:00,2026-11-26,LA Clippers,Memphis Grizzlies,LAC,MEM,97,115,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909322,2026-11-26 09:00,2026-11-26,Brooklyn Nets,Milwaukee Bucks,BKN,MIL,104,97,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909323,2026-11-26 09:30,2026-11-26,Phoenix Suns,Houston Rockets,PHX,HOU,104,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909324,2026-11-26 11:00,2026-11-26,Sacramento Kings,Golden State Warriors,SAC,GS,110,129,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
+401909325,2026-11-26 11:00,2026-11-26,San Antonio Spurs,Portland Trail Blazers,SA,POR,111,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909314,2026-11-25 08:00,2026-11-25,Detroit Pistons,Orlando Magic,DET,ORL,104,86,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909315,2026-11-25 09:00,2026-11-25,Boston Celtics,Washington Wizards,BOS,WSH,131,116,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
 401909316,2026-11-25 11:00,2026-11-25,Dallas Mavericks,Denver Nuggets,DAL,DEN,120,101,True,Final,,,,🔴 FINAL,NBA Cup - Group Play
